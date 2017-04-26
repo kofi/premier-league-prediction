@@ -1,0 +1,6 @@
+*.sqlite
+*.zip
+input/*
+../input/*
+*~
+*.bak*
