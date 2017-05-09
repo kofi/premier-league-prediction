@@ -64,7 +64,7 @@ my_team_id = my_team_info['team_api_id'][0]
 
 # In[3]:
 
-season = None #"2015/2016"
+season = None #"2010/2011" #,"2015/201"]
 matches = h.preprocess_matches_for_season(season)
 # filter out only the matches with the team of interest
 #matches = matches[(matches['home_team_api_id'] == my_team_id)  | (matches['away_team_api_id'] == my_team_id)]
@@ -75,7 +75,7 @@ matches = h.preprocess_matches_for_season(season)
 matches = h.clean_up_matches(matches)
 matches = h.encode_matches(matches)
 matches.describe()
-#print(matches.columns.T)
+print(matches.columns.T)
 #print(matches.shape)
 
 
@@ -121,7 +121,6 @@ print()
 #matches_hm_goals = matches.drop(['home_team_points','home_team_goal',
 #                                    'away_team_goal','home_team_outcome'], axis=1)
 
-
 # In[8]:
 
 from sklearn.preprocessing import StandardScaler
@@ -131,6 +130,7 @@ scaler = StandardScaler()
 allnas = matches.isnull().any()
 if (sum(allnas == True)):
     matches.dropna(inplace=True)
+
 # define the output variable
 y = np.array(matches['home_team_outcome'])
 
@@ -142,13 +142,25 @@ matches_hm_goals = matches.drop(['home_team_points','home_team_goal',
 # finally transform the data and scale to normalize
 X = np.array(scaler.fit_transform(matches_hm_goals)) 
 print("shape of X: {}".format(X.shape))
+
+
+# lets try with PCA
+from sklearn.decomposition import PCA
+pca = PCA(n_components=28)
+pca = pca.fit(X)
+X = pca.transform(X)
+
+#print("Percent explain variance")
+#print(100*pca.explained_variance_ratio_)
+
+
 #print(y.shape)
 
 ## algorithim by algorithm analysis
 #from sklearn.svm import LinearSVR
 from sklearn.dummy import DummyClassifier
 from sklearn.svm import SVC
-from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import GaussianNB as GNB
 from sklearn.linear_model import LogisticRegression as LR
 from sklearn.neighbors import KNeighborsClassifier as kNN
 
@@ -159,27 +171,36 @@ from sklearn.metrics import confusion_matrix
 
 # first split the data
 from sklearn.model_selection import train_test_split
-X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.33, random_state=54)
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.25, random_state=14)
 
 # get the baseline error/accuracy using a dummy classifier
 clf = DummyClassifier(strategy='most_frequent',random_state=0)
 clf.fit(X_train,y_train)
-print("Dummy Classifier Training score: {}".format(clf.score(X_train,y_train)))
-print("Dummy Classifier Test score: {}".format(clf.score(X_test,y_test)))
-print("Dummy Classifier F1 score: {}".format( f1_score(y_train, clf.predict(X_train),average='weighted'))) 
+#print("Dummy Classifier Training score: {}".format(clf.score(X_train,y_train)))
+#print("Dummy Classifier Test score: {}".format(clf.score(X_test,y_test)))
+print("Dummy Classifier F1 score: {}".format( f1_score(y_test, clf.predict(X_test),average='weighted'))) 
 print()
 # then train
 clf = SVC(kernel='linear')
 clf.fit(X_train,y_train)
 
 # ... get the training score
-
 print("Linear SVC Training score: {}".format(clf.score(X_train,y_train)))
 print("Linear SVC Training F1 score: {}".format( f1_score(y_train, clf.predict(X_train),average='weighted'))) #accuracy_score(y_train, clf.predict(X_train))))
 # get the test error/score
 print("Linear SVC Test score: {}".format(clf.score(X_test,y_test)))
 print("Linear SVC Test F1 score: {}".format( f1_score(y_test, clf.predict(X_test), average='weighted')))
 print()
+
+
+from sklearn.tree import DecisionTreeClassifier
+clf = DecisionTreeClassifier(random_state=0)
+clf.fit(X_train,y_train)
+
+y_test_pred = clf.predict(X_test)
+print("DecisionTree F1 score: {}".format( f1_score(y_test, y_test_pred,average='weighted')))
+print()
+
 
 # then change our accuracy to an rbf kernel
 clf = SVC(kernel='rbf')
@@ -194,30 +215,113 @@ print()
 # get the confusion matrix and plot for the RBF
 cnf_matrix = confusion_matrix(y_test, y_test_pred) #, labels=output_class)
 print(np.sum(np.sum(cnf_matrix)))
-y_test
+#y_test
 
-print("Verification of Confusion matrix")
-for i in output_class:
-    for j in output_class:
-        cnt_matrix = np.dot((y_test==i)*1.,(y_test_pred == j)*1)
-        print("{} but predicts {}:  {}".format(i,j,cnt_matrix))
+#print("Verification of Confusion matrix")
+#for i in output_class:
+#    for j in output_class:
+#        matrix_val = np.dot((y_test==i)*1.,(y_test_pred == j)*1)
+#        print("{} but predicts {}:  {}".format(i,j,matrix_val))
 
-np.set_printoptions(precision=2)
-plt.figure()
-h.plot_confusion_matrix(cnf_matrix, classes=output_class,
+print()
+print(cnf_matrix)
+
+debug =False
+if debug:
+     np.set_printoptions(precision=2)
+     plt.figure()
+     h.plot_confusion_matrix(cnf_matrix, classes=output_class,
                       title='Confusion matrix, without normalization')
 
-plt.figure()
-h.plot_confusion_matrix(cnf_matrix, classes=output_class, normalize=True,
+     plt.figure()
+     h.plot_confusion_matrix(cnf_matrix, classes=output_class, normalize=True,
                       title='Normalized Confusion matrix')
 
-plt.show() 
+     plt.show() 
 
 #### Problem seems to be the model is overpredicting one classifier.
 #### Could be a problem due to the unbalanced data set 
 #### need to come up with an approach to oversample the smaller categories
 #### and undersample the most frequent class
+draws = matches[matches['home_team_outcome'] == 'draw']
+wins = matches[matches['home_team_outcome'] == 'win']
+losses = matches[matches['home_team_outcome'] == 'lose']
 
+# subsample losses
+percentage = len(draws)/float(len(losses))
+losses_sampled =  losses.sample(frac = percentage, random_state = 2)
+percentage = len(draws)/float(len(wins))
+wins_sampled = wins.sample(frac = percentage, random_state = 2)
+
+matches_sampled = draws.append(wins_sampled)
+matches_sampled = matches_sampled.append(losses_sampled)
+
+print("Percentage wins		:", len(wins_sampled)/float(len(matches_sampled)))
+print("Percentage losses	:", len(losses_sampled)/float(len(matches_sampled)))
+print("Percentage draws		:", len(draws)/float(len(matches_sampled)))
+print("Total matches		:", len(matches_sampled))
+
+
+# define the output variable
+y = np.array(matches_sampled['home_team_outcome'])
+
+print("Unique Y ", matches_sampled['home_team_outcome'].unique())
+
+# then delete columns
+matches_hm_goals = matches_sampled.drop(['home_team_points','home_team_goal',
+                                    'away_team_goal','home_team_outcome'], axis=1)
+# finally transform the data and scale to normalize
+X = np.array(scaler.fit_transform(matches_hm_goals))
+print("shape of X: {}".format(X.shape))
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.25, random_state=14)
+
+## lets try with PCA
+from sklearn.decomposition import PCA
+pca = PCA(n_components=28)
+pca = pca.fit(X)
+X = pca.transform(X)
+
+#print("Percent explain variance")
+#print(100*pca.explained_variance_ratio_)
+
+
+
+# get the baseline error/accuracy using a dummy classifier
+clf = DummyClassifier(strategy='most_frequent',random_state=0)
+clf.fit(X_train,y_train)
+print("Dummy Classifier Training score: {}".format(clf.score(X_train,y_train)))
+print("Dummy Classifier Test score: {}".format(clf.score(X_test,y_test)))
+print("Dummy Classifier F1 score: {}".format( f1_score(y_test, clf.predict(X_test),average='weighted')))
+print()
+
+
+# then change our accuracy to an rbf kernel
+clf = SVC(kernel='rbf')
+clf.fit(X_train,y_train)
+print("RBF SVC Training score: {}".format(clf.score(X_train,y_train)))
+print("RBF SVC Training F1 score: {}".format( f1_score(y_train, clf.predict(X_train),average='weighted')))
+print("RBF SVC Test score: {}".format(clf.score(X_test,y_test)))
+y_test_pred = clf.predict(X_test)
+print("RBF SVC Test F1 score: {}".format( f1_score(y_test, y_test_pred,average='weighted')))
+print()
+
+
+# get the confusion matrix and plot for the RBF
+cnf_matrix = confusion_matrix(y_test, y_test_pred) #, labels=output_class)
+print(np.sum(np.sum(cnf_matrix)))
+#y_test
+
+print("Verification of Confusion matrix")
+#for i in output_class:
+#    for j in output_class:
+#        matrix_val = np.dot((y_test==i)*1.,(y_test_pred == j)*1)
+#        print("{} but predicts {}:  {}".format(i,j,matrix_val))
+ 
+print()
+#print(cnf_matrix)
+cm = cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
+print()
+#print(cm)
 
 # # then a chi2_kernel
 # k_chi = chi2_kernel(X_train)
@@ -225,6 +329,46 @@ plt.show()
 # #clf.fit(X_train,y_train)
 # print("Chi2 SVC Training score: {}".format(clf.score(X_train,y_train)))
 # print("Chi2 SVC Test score: {}".format(clf.score(X_test,y_test)))
+
+# then change our accuracy to an rbf kernel
+clf =  GNB()
+clf.fit(X_train,y_train)
+print("GaussianNB Training score: {}".format(clf.score(X_train,y_train)))
+print("GaussianNB Training F1 score: {}".format( f1_score(y_train, clf.predict(X_train),average='weighted')))
+print("GaussianNB Test score: {}".format(clf.score(X_test,y_test)))
+y_test_pred = clf.predict(X_test)
+print("GaussianNB Test F1 score: {}".format( f1_score(y_test, y_test_pred,average='weighted')))
+print()
+
+
+#http://scikit-learn.org/stable/auto_examples/linear_model/plot_sgd_iris.html
+from sklearn import linear_model
+clf = linear_model.SGDClassifier(alpha=0.001, n_iter=100)
+clf.fit(X_train,y_train)
+print("SGD Training score: {}".format(clf.score(X_train,y_train)))
+print("SGD Training F1 score: {}".format( f1_score(y_train, clf.predict(X_train),average='weighted')))
+print("SGD Test score: {}".format(clf.score(X_test,y_test)))
+y_test_pred = clf.predict(X_test)
+print("SGD Test F1 score: {}".format( f1_score(y_test, y_test_pred,average='weighted')))
+print()
+
+
+
+# get the confusion matrix and plot for the RBF
+cnf_matrix = confusion_matrix(y_test, y_test_pred) #, labels=output_class)
+#print(np.sum(np.sum(cnf_matrix)))
+#y_test
+
+
+from sklearn.tree import DecisionTreeClassifier
+clf = DecisionTreeClassifier(random_state=0)
+clf.fit(X_train,y_train)
+
+y_test_pred = clf.predict(X_test)
+print("DecisionTree F1 score: {}".format( f1_score(y_test, y_test_pred,average='weighted')))
+print()
+
+
 
 sys.exit()
 

@@ -215,7 +215,7 @@ def clean_up_matches(matches):
     '''
     matches.index = matches['match_id']
     # then drop the match_id and also drop stage for now
-    to_drop = ['match_id', 'stage',  'match_date','home_team_api_id',
+    to_drop = [ 'match_id', 'stage', 'match_date','home_team_api_id',
             'away_team_api_id','home_team', 'away_team','season',
             'home_buildUpPlayDribbling','away_buildUpPlayDribbling']  
     #'home_team_goal', 'away_team_goal',
