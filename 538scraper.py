@@ -16,16 +16,25 @@
 
 '''
 import os
+import gzip
 from bs4 import BeautifulSoup
+import urllib
 import requests
 #import csv
 import pandas as pd
 
 predicts = 'predictions.html'
 csv_file = 'epl_2017_predictions.csv'
+url = 'https://projects.fivethirtyeight.com/soccer-predictions/'
 
-with open(predicts) as fp:
-    soup = BeautifulSoup(fp,"lxml")
+r = urllib.request.urlopen(url).read()
+# if request returns a gzipped resource then gunzip it first
+try:
+    r =  gzip.decompress(r)
+except OSError:
+    pass
+
+soup = BeautifulSoup(r.decode(),"lxml")
 
 #print(soup.prettify())
 # Get all matches using the match-container div class
@@ -81,8 +90,6 @@ for match in all_matches:
 
     # update the dictionary
     cnt = cnt + 1
-    #match_info = match_info.update({'cnt':cnt, 'away_team':t_name, 'away_goals':t_score,
-    #                                'away_win_prob': t_prob})
     
     match_info['cnt'] = cnt
     match_info['away_team'] = t_name
@@ -103,8 +110,6 @@ except OSError:
 # write out the file into a csv file
 with open(csv_file, 'w', encoding='utf-8') as c:
     # set up the csv
-    #c = csv.writer(csvfile,  quoting=csv.QUOTE_MINIMAL)        
-    #    c.writerows(csv_string) #.decode('utf-8').split(","))
     c.write(csv_string)
 
 
