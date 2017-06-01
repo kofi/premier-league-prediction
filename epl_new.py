@@ -57,6 +57,7 @@ my_team_info = h.get_team_id(my_team)
 my_team_id = my_team_info['team_api_id'][0]
 #print(my_team_id)
 
+#assert(1==-1)
 
 # ### Get match information 
 # filter on epl and get the actual team names
@@ -64,7 +65,7 @@ my_team_id = my_team_info['team_api_id'][0]
 
 # In[3]:
 
-season = None #"2010/2011" #,"2015/201"]
+season = ['2010/2011','2011/2012'] #,'2012/2013']
 matches = h.preprocess_matches_for_season(season)
 # filter out only the matches with the team of interest
 #matches = matches[(matches['home_team_api_id'] == my_team_id)  | (matches['away_team_api_id'] == my_team_id)]
@@ -75,7 +76,7 @@ matches = h.preprocess_matches_for_season(season)
 matches = h.clean_up_matches(matches)
 matches = h.encode_matches(matches)
 matches.describe()
-print(matches.columns.T)
+#print(matches.columns.T)
 #print(matches.shape)
 
 
@@ -114,6 +115,8 @@ print("Home team loss percentage: {}".format(percent_home_loss))
 print("Home team draw percentage: {}".format(percent_home_draw))
 print()
 
+
+
 # In[7]:
 
 # Predicted home team goals analysis
@@ -128,8 +131,14 @@ scaler = StandardScaler()
 
 # drop Nan rows
 allnas = matches.isnull().any()
+#print(allnas)
+
 if (sum(allnas == True)):
     matches.dropna(inplace=True)
+
+print("Dataframe shape after dropping rows {}".format(*matches.shape))
+
+#assert(1==-1)
 
 # define the output variable
 y = np.array(matches['home_team_outcome'])
@@ -148,7 +157,7 @@ print("shape of X: {}".format(X.shape))
 from sklearn.decomposition import PCA
 pca = PCA(n_components=28)
 pca = pca.fit(X)
-X = pca.transform(X)
+#X = pca.transform(X)
 
 #print("Percent explain variance")
 #print(100*pca.explained_variance_ratio_)
@@ -243,22 +252,42 @@ if debug:
 #### Could be a problem due to the unbalanced data set 
 #### need to come up with an approach to oversample the smaller categories
 #### and undersample the most frequent class
+
+print('### Subsampling Data ####')
 draws = matches[matches['home_team_outcome'] == 'draw']
 wins = matches[matches['home_team_outcome'] == 'win']
 losses = matches[matches['home_team_outcome'] == 'lose']
+print("Losses:{}, draws:{}, wins:{}".format(len(losses), len(draws), len(wins)))
 
 # subsample losses
-percentage = len(draws)/float(len(losses))
-losses_sampled =  losses.sample(frac = percentage, random_state = 2)
-percentage = len(draws)/float(len(wins))
-wins_sampled = wins.sample(frac = percentage, random_state = 2)
+are_draws_small = True if len(draws) < len(losses) else False
 
-matches_sampled = draws.append(wins_sampled)
-matches_sampled = matches_sampled.append(losses_sampled)
+if are_draws_small:
+    percentage = len(draws)/float(len(losses))
+    losses_sampled =  losses.sample(frac = percentage, random_state = 2)
+    percentage = len(draws)/float(len(wins))
+    wins_sampled = wins.sample(frac = percentage, random_state = 2)
+    matches_sampled = draws.append(wins_sampled)
+    matches_sampled = matches_sampled.append(losses_sampled)
+
+    # print stats
+    print("Percentage losses	:", len(losses_sampled)/float(len(matches_sampled)))
+    print("Percentage draws		:", len(draws)/float(len(matches_sampled)))
+else:
+    percentage = len(losses)/float(len(draws))
+    draws_sampled =  draws.sample(frac = percentage, random_state = 2)
+    percentage = len(losses)/float(len(wins))
+    wins_sampled = wins.sample(frac = percentage, random_state = 2)
+    matches_sampled = losses.append(wins_sampled)
+    matches_sampled = matches_sampled.append(draws_sampled)
+
+    #print stats
+    print("Percentage draws	:", len(draws_sampled)/float(len(matches_sampled)))
+    print("Percentage losses		:", len(losses)/float(len(matches_sampled)))
+#matches_sampled = draws.append(wins_sampled)
+#matches_sampled = matches_sampled.append(losses_sampled)
 
 print("Percentage wins		:", len(wins_sampled)/float(len(matches_sampled)))
-print("Percentage losses	:", len(losses_sampled)/float(len(matches_sampled)))
-print("Percentage draws		:", len(draws)/float(len(matches_sampled)))
 print("Total matches		:", len(matches_sampled))
 
 
@@ -279,7 +308,7 @@ X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.25, random_
 from sklearn.decomposition import PCA
 pca = PCA(n_components=28)
 pca = pca.fit(X)
-X = pca.transform(X)
+#X = pca.transform(X)
 
 #print("Percent explain variance")
 #print(100*pca.explained_variance_ratio_)
@@ -294,6 +323,14 @@ print("Dummy Classifier Test score: {}".format(clf.score(X_test,y_test)))
 print("Dummy Classifier F1 score: {}".format( f1_score(y_test, clf.predict(X_test),average='weighted')))
 print()
 
+
+# ... get the training score
+print("Linear SVC Training score: {}".format(clf.score(X_train,y_train)))
+print("Linear SVC Training F1 score: {}".format( f1_score(y_train, clf.predict(X_train),average='weighted'))) #accuracy_score(y_train, clf.predict(X_train))))
+# get the test error/score
+print("Linear SVC Test score: {}".format(clf.score(X_test,y_test)))
+print("Linear SVC Test F1 score: {}".format( f1_score(y_test, clf.predict(X_test), average='weighted')))
+print()
 
 # then change our accuracy to an rbf kernel
 clf = SVC(kernel='rbf')

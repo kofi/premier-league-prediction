@@ -16,28 +16,30 @@ import numpy as np
 import pandas as pd
 
 
-def preprocess_matches_for_season(season):
+def preprocess_matches_for_season(seasons):
     '''
     do all the preprocessing and return a matches dataframe ready 
     for learning
     '''
-    if season:
-        # get matches for the season
-        matches = get_matches_for_season(season) 
-        # We only need the first 11 columns for this analysis. the other data is betting data
-        matches = matches[matches.columns[:11]]
+    # if seasons:
+    #     # get matches for the season
+    #     matches = get_matches_for_season(season) 
+    #     # We only need the first 11 columns for this analysis. the other data is betting data
+    #     matches = matches[matches.columns[:11]]
 
-        # get attributes
-        team_attributes = get_attributes_for_season(season)
+    #     # get attributes
+    #     team_attributes = get_attributes_for_seasons(season)
 
-        # get teams
-        teams = get_teams()
+    #     # get teams
+    #     teams = get_teams()
 
-        # do merges of matches with teams and team_attributes
-        matches = merge_matches_teams(matches, teams)
-        matches = merge_matches_attributes(matches, team_attributes)
-    else:
-        matches = get_all_seasons_data()#matches, team_attributes)
+    #     # do merges of matches with teams and team_attributes
+    #     matches = merge_matches_teams(matches, teams)
+    #     matches = merge_matches_attributes(matches, team_attributes)
+    # else:
+    matches = get_all_seasons_data(seasons) #matches, team_attributes)
+
+    #assert(1==-1)
 
     return matches
 
@@ -62,8 +64,7 @@ def get_team_id(team_name):
     # create the cursor
     cur= con.cursor()
     query = "SELECT team_api_id FROM Team where team_long_name like '%{}%'".format(team_name)
-    #query = "SELECT team_api_id FROM Team where team_long_name like %{}%".format(team_name)
-    #print query
+
     return pd.read_sql(query,con=con)
 
 def get_season_as_date(season):
@@ -82,9 +83,9 @@ def get_matches_for_season(season=None):
     query = "select * from League where name like '%England%'"
     eplinfo = pd.read_sql(query, con=con)
 
-    if season is not None:
+    if (season is not None) and len(season)==1:
         query = "Select * from Match \
-                where league_id = {} and season='{}'".format(eplinfo['id'][0], season)
+                where league_id = {} and season='{}'".format(eplinfo['id'][0], season[0])
     else:
         query = "Select * from Match where league_id = {} ".format(eplinfo['id'][0])
     matches = pd.read_sql(query, con=con)
@@ -95,9 +96,11 @@ def get_matches_for_seasons(seasons):
     '''
     Get matches for multiple seasons
     '''
+    if seasons is None:
+        return get_matches_for_season(season = None)
     start_season = seasons[0]
     matches = get_matches_for_season(start_season)
-    for s in xrange(1,len(seasons)):
+    for s in range(1,len(seasons)):
         matches = matches.append(get_matches_for_season(seasons[s]), ignore_index=True)
         #print(matches.shape)
     return matches
@@ -106,11 +109,15 @@ def get_attributes_for_seasons(seasons):
     '''
     Get matches for multiple seasons
     '''
+    if seasons is None:
+        return get_attributes_for_season(season=None)
     start_season = seasons[0]
     attrs = get_attributes_for_season(start_season)
-    for s in xrange(1,len(seasons)):
+    #print(attrs.columns.T)
+    #print("attributes shape {}".format(*attrs.shape))
+    for s in range(1,len(seasons)):
         attrs = attrs.append(get_attributes_for_season(seasons[s]), ignore_index=True)
-        #print(attrs.shape)
+        #print("attributes shape {}".format(*attrs.shape))
     return attrs
 
 def get_attributes_for_season(season=None):
@@ -125,10 +132,11 @@ def get_attributes_for_season(season=None):
         [sstart, ssend] = season.split('/')
         query = "SELECT * FROM Team_Attributes where date >= '{}' and date <='{}'".format(
                 get_season_as_date(sstart), get_season_as_date(ssend))
+        #print("query : {}",(query))
     else:
         query = "SELECT * FROM Team_Attributes"
+    
     team_attributes = pd.read_sql(query, con=con)
-
     return team_attributes
 
 def merge_matches_teams(matches, teams):
@@ -214,10 +222,11 @@ def clean_up_matches(matches):
     also drop some additioonal columns: either ids or 
     '''
     matches.index = matches['match_id']
+    print(matches.shape)
     # then drop the match_id and also drop stage for now
     to_drop = [ 'match_id', 'stage', 'match_date','home_team_api_id',
-            'away_team_api_id','home_team', 'away_team','season',
-            'home_buildUpPlayDribbling','away_buildUpPlayDribbling']  
+            'away_team_api_id','home_team', 'away_team','season'] #,
+            #'home_buildUpPlayDribbling','away_buildUpPlayDribbling']  
     #'home_team_goal', 'away_team_goal',
     # make a copy of the matches dataframe and drop the appropriate fields while deleting the unneeded features
     matches = matches.drop(to_drop, axis =1)
@@ -234,17 +243,19 @@ def encode_matches(matches):
 
     return matches
     
-def get_all_seasons_data(): #matches,tattr):
+def get_all_seasons_data(seasons): #matches,tattr):
     '''
     get the number of unique seasons in the matches dataframe
     '''
-    matches = get_matches_for_season(None) 
+    matches = get_matches_for_seasons(seasons) # if seasons else get_matches_for_season(seasons)   
     matches = matches[matches.columns[:11]]
 
     # get attributes
-    tattr = get_attributes_for_season(None)
+    tattr = get_attributes_for_seasons(seasons)
 
-    seasons = matches['season'].unique()
+    if seasons is None:
+        seasons = matches['season'].unique()
+    
     teams = get_teams()
     # create an empty array to store our data
     newmatches = pd.DataFrame()
@@ -252,7 +263,7 @@ def get_all_seasons_data(): #matches,tattr):
     for e in seasons:
 
         # get the corresponding matches
-        #print(e)
+        print(e)
         m = matches[matches['season'] == e]
         #print(m.shape)
 
@@ -288,10 +299,12 @@ def get_all_seasons_data(): #matches,tattr):
         #    #print newmatches.shape
         #else:
         newmatches = newmatches.append(m, ignore_index=False)
+        print(newmatches.shape)
         #    print m.shape
         #    print newmatches.shape
         #print m
-        
+    
+
     return newmatches
 
 #print(matches.shape)
