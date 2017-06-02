@@ -122,17 +122,15 @@ def get_attributes_for_seasons(seasons):
 
 def get_attributes_for_season(season=None):
     '''
-        Get team attributes data from the database
+    Get team attributes data from the database
     '''
     con = None
     con = sql.connect('../input/database.sqlite')
-    #cur = con.cursor()
 
     if season:
         [sstart, ssend] = season.split('/')
         query = "SELECT * FROM Team_Attributes where date >= '{}' and date <='{}'".format(
                 get_season_as_date(sstart), get_season_as_date(ssend))
-        #print("query : {}",(query))
     else:
         query = "SELECT * FROM Team_Attributes"
     
@@ -147,7 +145,6 @@ def merge_matches_teams(matches, teams):
                     right_on='team_api_id')
     matches = matches.drop(['country_id','league_id','id_y','team_api_id',
                     'team_fifa_api_id','team_short_name'], axis=1)
-    #print(matches.shape)
 
     matches.rename(columns={'id_x':'match_id','date':'match_date','team_long_name':'home_team'}, 
                 inplace=True)
@@ -157,7 +154,6 @@ def merge_matches_teams(matches, teams):
 
     matches.rename(columns={'team_long_name':'away_team'}, inplace=True)
     matches.head()
-    #print(matches.shape)
 
     return matches
 
@@ -222,15 +218,15 @@ def clean_up_matches(matches):
     also drop some additioonal columns: either ids or 
     '''
     matches.index = matches['match_id']
-    print(matches.shape)
+    #print(matches.shape)
     # then drop the match_id and also drop stage for now
     to_drop = [ 'match_id', 'stage', 'match_date','home_team_api_id',
-            'away_team_api_id','home_team', 'away_team','season'] #,
-            #'home_buildUpPlayDribbling','away_buildUpPlayDribbling']  
+            'away_team_api_id','home_team', 'away_team','season',
+            'home_buildUpPlayDribbling','away_buildUpPlayDribbling']  
     #'home_team_goal', 'away_team_goal',
     # make a copy of the matches dataframe and drop the appropriate fields while deleting the unneeded features
     matches = matches.drop(to_drop, axis =1)
-    print(matches.shape)
+    #print(matches.shape)
 
     return matches
 
@@ -238,7 +234,9 @@ def encode_matches(matches):
     '''
     encode category columns using the dummies to create a column per option
     '''
+    # get categorical data ...
     cat_list= matches.select_dtypes(include=['object']).columns.tolist()
+    # then encode those columns ...
     matches = pd.get_dummies(matches, prefix=cat_list)
 
     return matches
@@ -299,7 +297,7 @@ def get_all_seasons_data(seasons): #matches,tattr):
         #    #print newmatches.shape
         #else:
         newmatches = newmatches.append(m, ignore_index=False)
-        print(newmatches.shape)
+        #print(newmatches.shape)
         #    print m.shape
         #    print newmatches.shape
         #print m

@@ -4,8 +4,6 @@
 # # Exploring how team attributes impact scores in the premier league
 # ## Merge the match and (winning) team data to evaluate which team features most impact 
 
-# In[1]:
-
 # This Python 3 environment comes with many helpful analytics libraries installed
 # It is defined by the kaggle/python docker image: https://github.com/kaggle/docker-python
 # For example, here's several helpful packages to load in 
@@ -13,13 +11,14 @@ import sys
 #from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QVBoxLayout, QSizePolicy, QMessageBox, QWidget, QPushButton
 #from PyQt5.QtGui import QIcon
 import itertools
+import math
 import numpy as np # linear algebra
 import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+import random
 import sqlite3 as sql
 import matplotlib
 matplotlib.use('TkAgg') #"Qt5Agg")
 import matplotlib.pyplot as plt
-
 
 #******************************************************************
 #from PyQt5 import QtCore
@@ -28,6 +27,30 @@ sbn.set()
 import helpers as h
 import sys
 
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
+
+from sklearn.model_selection import KFold #cross_validation import KFold
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import log_loss
+
+from sklearn.dummy import DummyClassifier
+from sklearn.svm import SVC
+from sklearn.naive_bayes import GaussianNB as GNB
+from sklearn.linear_model import LogisticRegression as LR
+from sklearn.neighbors import KNeighborsClassifier as kNN
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import SGDClassifier
+
+from sklearn.metrics.pairwise import chi2_kernel
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import f1_score
+from sklearn.metrics import confusion_matrix
+
+
+
+
 # Input data files are available in the "../input/" directory.
 # For example, running this (by clicking run or pressing Shift+Enter) will list the files in the input directory
 
@@ -35,196 +58,244 @@ import sys
 #print(check_output(["ls", "../input"]).decode("utf8"))
 
 # Any results you write to the current directory are saved as output.
+all_seasons=['2008/2009','2009/2010','2010/2011','2011/2012',
+    '2012/2013','2013/2014','2014/2015','2015/2016']
+predictors = []
+#clfs = ['SVR','LinearSVR']  #,'Lasso','RF','KNN']
+nfolds = 5
+
+def get_scores(clf, X, y):
+	gen_score = clf.score(X,y)
+	f1 = f1_score(y, clf.predict(X),average='weighted')
+	ll = log_loss(y,clf.predict_proba(X))
+	scores =  {'score': gen_score, 'f1_score': f1, 'log_loss': ll}
+	#print("{0} score:{score}, f1 score:{f1_score}, logloss:{log_loss}".format(type(clf).__name__,**scores))
+
+	#print("{} Training score: {}".format(clf.__name__, clf.score(X_train,y_train)))
+	#print("RBF SVC Training F1 score: {}".format( f1_score(y_train, clf.predict(X_train),average='weighted')))
+	#print("RBF SVC Test score: {}".format(clf.score(X_test,y_test)))
+	#y_test_pred = clf.predict(X_test)
+	#print("RBF SVC Test F1 score: {}".format( f1_score(y_test, y_test_pred,average='weighted')))
+
+	return scores
 
 
-# In[2]:
+def run_kfolds(X,y,clf_class,**kwargs):
+    # Construct a kfolds object
+    kf = KFold(n_splits=nfolds,shuffle=True)
+    y_pred = y.copy()
+    scores = None
+    cnf_matrix = None 
+    clf = None
+    # Iterate through folds
+    for train_index, test_index in kf.split(X):
+        # get the training and test sets
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
 
-# create the connection to the database
-con = None
-con = sql.connect('../input/database.sqlite')
-# create the cursor
-cur= con.cursor()
-# select only the information for the EPL
-#   - changed from sqlite interface to use pd.read_sql
-query = "select * from League where name like '%England%'"
-eplinfo = pd.read_sql(query,con=con) 
-# get the leagues
-query = "select * from League"
-leagues = pd.read_sql(query,con=con)
-my_team = 'Liverpool'
-my_team_info = h.get_team_id(my_team)
-#print(my_team_info['team_api_id'])
-my_team_id = my_team_info['team_api_id'][0]
-#print(my_team_id)
+        # Initialize a classifier with key word argument
+        clf = clf_class(**kwargs)
+        # then fit the training data fold
+        clf.fit(X_train,y_train)
+        # get the scores
+        local_score = get_scores(clf, X_test, y_test)
+        if scores is None:
+            scores = local_score
+        else:
+            for k,v in scores.items():
+                scores[k] = scores[k]+ local_score[k]
+    cnf_matrix = confusion_matrix(y_test, clf.predict(X_test))
 
-#assert(1==-1)
+    # compute the average scores across all folds
+    scores = {k: v/(nfolds *1.0) for k,v in scores.items()}
+    scores['clf'] = clf.__class__.__name__
+    if 'kernel' in kwargs:
+        scores['clf'] = ("{}_{}".format(scores['clf'],kwargs['kernel']))
+    return scores
 
-# ### Get match information 
-# filter on epl and get the actual team names
-# also select date, season, date and time, home team goal, away team goals, home team wins?
+def get_random_seasons(n_seasons):
+    return [all_seasons[i] for i in random.sample(range(len(all_seasons)),n_seasons)]
 
-# In[3]:
+    
+def matches_for_analysis(n_seasons):
 
-season = ['2010/2011','2011/2012'] #,'2012/2013']
-matches = h.preprocess_matches_for_season(season)
-# filter out only the matches with the team of interest
-#matches = matches[(matches['home_team_api_id'] == my_team_id)  | (matches['away_team_api_id'] == my_team_id)]
-# set the home status of the team of interest
-#matches.loc[matches['home_team_api_id'] == my_team_id,'isteamhome'] = 1
-#matches.loc[matches['home_team_api_id'] != my_team_id,'isteamhome'] = 0
+    # create the connection to the database
+    con = None
+    con = sql.connect('../input/database.sqlite')
+    # create the cursor
+    cur= con.cursor()
+    # select only the information for the EPL
+    #   - changed from sqlite interface to use pd.read_sql
+    query = "select * from League where name like '%England%'"
+    eplinfo = pd.read_sql(query,con=con) 
+    # get the leagues
+    query = "select * from League"
+    leagues = pd.read_sql(query,con=con)
+    my_team = 'Liverpool'
+    my_team_info = h.get_team_id(my_team)
+    #print(my_team_info['team_api_id'])
+    my_team_id = my_team_info['team_api_id'][0]
+    #print(my_team_id)
 
-matches = h.clean_up_matches(matches)
-matches = h.encode_matches(matches)
-matches.describe()
-#print(matches.columns.T)
-#print(matches.shape)
+    season = None #get_random_seasons(n_seasons) #['2010/2011','2011/2012','2012/2013','2013/2014']
+    matches = h.preprocess_matches_for_season(season)
+    # filter out only the matches with the team of interest
+    #matches = matches[(matches['home_team_api_id'] == my_team_id)  | (matches['away_team_api_id'] == my_team_id)]
+    # set the home status of the team of interest
+    #matches.loc[matches['home_team_api_id'] == my_team_id,'isteamhome'] = 1
+    #matches.loc[matches['home_team_api_id'] != my_team_id,'isteamhome'] = 0
 
+    #print("Shape before cleanup and encode: {}".format(matches.shape))
+    matches = h.clean_up_matches(matches)
+    matches = h.encode_matches(matches)
+    #matches.describe()
+    #matches.info()
+    #print(matches.columns.T)
+    #print("Shape after cleanup and encode: {}".format(matches.shape))
 
+    # create the output columns
+    matches['home_team_points'] = 3*(matches['home_team_goal'] > matches['away_team_goal']) + \
+                1*(matches['home_team_goal'] == matches['away_team_goal'])
 
+    # define the output classes
+    output_class = np.array(['draw','lose','win'])
+    matches['home_team_outcome'] = 'draw'
+    matches.loc[matches['home_team_goal'] > matches['away_team_goal'],['home_team_outcome']] = 'win'
+    matches.loc[matches['home_team_goal'] < matches['away_team_goal'],['home_team_outcome']] = 'lose'
+    #matches.info()
 
-# In[4]:
+    matches.head()
+    cols = ['home_team_goal','away_team_goal', 'home_team_outcome','home_team_points'] #,'isteamhome']
+    matches[cols].tail()
 
-# create the output columns
-matches['home_team_points'] = 3*(matches['home_team_goal'] > matches['away_team_goal']) + \
-            1*(matches['home_team_goal'] == matches['away_team_goal'])
+    # get some statistics
+    # home team win percentages
+    percent_home_win = np.sum(matches['home_team_points'] == 3)/(1. * np.max(matches.shape[0]))
+    percent_home_loss = np.sum(matches['home_team_points'] == 0)/(1. * np.max(matches.shape[0]))
+    percent_home_draw = np.sum(matches['home_team_points'] == 1)/(1. * np.max(matches.shape[0]))
+    win_stats = [percent_home_win, percent_home_loss, percent_home_draw]
+    matches_entropy = -np.sum([k*math.log(k,3) for k in win_stats])
+    print("Home team {:.3f} wins, {:.2f} losses, {:.2f} draws".format(
+            100*percent_home_win,100*percent_home_loss,100*percent_home_draw))
+    print("Matches entropy: {:f}".format(matches_entropy))
+    #print()
 
-# define the output classes
-output_class = np.array(['draw','lose','win'])
-matches['home_team_outcome'] = 'draw'
-matches.loc[matches['home_team_goal'] > matches['away_team_goal'],['home_team_outcome']] = 'win'
-matches.loc[matches['home_team_goal'] < matches['away_team_goal'],['home_team_outcome']] = 'lose'
-#matches.info()
+    # drop Nan rows
+    allnas = matches.isnull().any()
+    #print(allnas)
 
+    if (sum(allnas == True)):
+        matches.dropna(inplace=True)
 
-# In[5]:
+    #print("Dataframe shape after dropping rows {}".format(matches.shape))
 
-matches.head()
-cols = ['home_team_goal','away_team_goal', 'home_team_outcome','home_team_points'] #,'isteamhome']
-matches[cols].tail()
+    # define the output variable
+    y = np.array(matches['home_team_outcome'])
+    #print("Unique Y ", matches['home_team_outcome'].unique())
 
-
-# In[6]:
-
-# get some statistics
-# home team win percentages
-percent_home_win = np.sum(matches['home_team_points'] == 3)/(1. * np.max(matches.shape[0]))
-percent_home_loss = np.sum(matches['home_team_points'] == 0)/(1. * np.max(matches.shape[0]))
-percent_home_draw = np.sum(matches['home_team_points'] == 1)/(1. * np.max(matches.shape[0]))
-print("Home team win percentage: {}".format(percent_home_win))
-print("Home team loss percentage: {}".format(percent_home_loss))
-print("Home team draw percentage: {}".format(percent_home_draw))
-print()
-
-
-
-# In[7]:
-
-# Predicted home team goals analysis
-#y = np.array(matches[ 'home_team_outcome']) #
-#matches_hm_goals = matches.drop(['home_team_points','home_team_goal',
-#                                    'away_team_goal','home_team_outcome'], axis=1)
-
-# In[8]:
-
-from sklearn.preprocessing import StandardScaler
-scaler = StandardScaler()
-
-# drop Nan rows
-allnas = matches.isnull().any()
-#print(allnas)
-
-if (sum(allnas == True)):
-    matches.dropna(inplace=True)
-
-print("Dataframe shape after dropping rows {}".format(*matches.shape))
-
-#assert(1==-1)
-
-# define the output variable
-y = np.array(matches['home_team_outcome'])
-
-print("Unique Y ", matches['home_team_outcome'].unique())
-
-# then delete columns
-matches_hm_goals = matches.drop(['home_team_points','home_team_goal',
+    # then delete columns
+    matches_hm_goals = matches.drop(['home_team_points','home_team_goal',
                                     'away_team_goal','home_team_outcome'], axis=1)
-# finally transform the data and scale to normalize
-X = np.array(scaler.fit_transform(matches_hm_goals)) 
-print("shape of X: {}".format(X.shape))
+
+    # finally transform the data and scale to normalize
+    X = np.array(StandardScaler().fit_transform(matches_hm_goals)) 
+    #print("Shape of X after scaling: {}".format(X.shape))
+
+    return {'rawdata':matches, 'data':matches_hm_goals, 'X':X, 'y':y}
 
 
-# lets try with PCA
-from sklearn.decomposition import PCA
-pca = PCA(n_components=28)
-pca = pca.fit(X)
-#X = pca.transform(X)
 
-#print("Percent explain variance")
-#print(100*pca.explained_variance_ratio_)
+if __name__ == '__main__':
+    
+    for i in range(1,2): #len(all_seasons)): 
+        output = matches_for_analysis(i)
+        X = output['X']
+        y = output['y']
+        matches = output['rawdata']
+        model_matches = output['data']
+        # lets try with PCA
+        pca = PCA(n_components=28)
+        pca = pca.fit(X)
+        X = pca.transform(X)
+        print("Shape of X after PCA: {}".format(X.shape))
+
+        #print("Percent explain variance")
+        #print(100*pca.explained_variance_ratio_)
+
+        # first split the data
+        #from sklearn.model_selection import train_test_split
+        #X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.25, random_state=14)
+
+        #matches_hm_goals.info()
+        #print()
+
+        # ... get the training score
+        clfs = [{'clf': SVC, 'params':{'kernel':'rbf', 'probability':True}}]
+        # clfs = [{'clf': DummyClassifier, 'params':{'strategy':'most_frequent','random_state':0}},
+        #         {'clf': SVC, 'params':{'kernel':'linear', 'probability':True}},
+        #             {'clf': SVC, 'params':{'kernel':'rbf', 'probability':True}},
+        #             {'clf': DecisionTreeClassifier, 'params':{'random_state':0}},
+        #             {'clf': GNB, 'params':{}},
+        #             {'clf': SGDClassifier, 'params':{'loss':'log','alpha':0.001,'n_iter':100}}]
+        all_scores = []
+        for k in clfs:
+            scores = run_kfolds(X,y,k['clf'], **k['params'])
+            all_scores.append(scores)
 
 
-#print(y.shape)
+        df_scores = pd.DataFrame(all_scores)
+        print(df_scores)
 
-## algorithim by algorithm analysis
-#from sklearn.svm import LinearSVR
-from sklearn.dummy import DummyClassifier
-from sklearn.svm import SVC
-from sklearn.naive_bayes import GaussianNB as GNB
-from sklearn.linear_model import LogisticRegression as LR
-from sklearn.neighbors import KNeighborsClassifier as kNN
 
-from sklearn.metrics.pairwise import chi2_kernel
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import f1_score
-from sklearn.metrics import confusion_matrix
 
-# first split the data
-from sklearn.model_selection import train_test_split
-X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.25, random_state=14)
+assert(1==-1)
 
-# get the baseline error/accuracy using a dummy classifier
-clf = DummyClassifier(strategy='most_frequent',random_state=0)
-clf.fit(X_train,y_train)
-#print("Dummy Classifier Training score: {}".format(clf.score(X_train,y_train)))
-#print("Dummy Classifier Test score: {}".format(clf.score(X_test,y_test)))
-print("Dummy Classifier F1 score: {}".format( f1_score(y_test, clf.predict(X_test),average='weighted'))) 
-print()
-# then train
-clf = SVC(kernel='linear')
-clf.fit(X_train,y_train)
+#print("Linear SVC")
+#params = {'kernel':'linear', 'probability':True}
+#scores = run_kfolds(X, y, SVC, **params)
+#print(scores)
 
-# ... get the training score
-print("Linear SVC Training score: {}".format(clf.score(X_train,y_train)))
-print("Linear SVC Training F1 score: {}".format( f1_score(y_train, clf.predict(X_train),average='weighted'))) #accuracy_score(y_train, clf.predict(X_train))))
+#print("Linear SVC Training score: {}".format(clf.score(X_train,y_train)))
+#print("Linear SVC Training F1 score: {}".format( f1_score(y_train, clf.predict(X_train),average='weighted'))) #accuracy_score(y_train, clf.predict(X_train))))
 # get the test error/score
-print("Linear SVC Test score: {}".format(clf.score(X_test,y_test)))
-print("Linear SVC Test F1 score: {}".format( f1_score(y_test, clf.predict(X_test), average='weighted')))
-print()
+#print("Linear SVC Test score: {}".format(clf.score(X_test,y_test)))
+#print("Linear SVC Test F1 score: {}".format( f1_score(y_test, clf.predict(X_test), average='weighted')))
+#print()
 
 
-from sklearn.tree import DecisionTreeClassifier
-clf = DecisionTreeClassifier(random_state=0)
-clf.fit(X_train,y_train)
 
-y_test_pred = clf.predict(X_test)
-print("DecisionTree F1 score: {}".format( f1_score(y_test, y_test_pred,average='weighted')))
-print()
+#clf = DecisionTreeClassifier(random_state=0)
+#clf.fit(X_train,y_train)
+
+#print("Decision Tree")
+#scores = run_kfolds(X,y,DecisionTreeClassifier, random_state=0)#, probability= True)
+#print("Final scores")
+#print(scores)
+#y_test_pred = clf.predict(X_test)
+#print("DecisionTree F1 score: {}".format( f1_score(y_test, y_test_pred,average='weighted')))
+
+#print()
 
 
 # then change our accuracy to an rbf kernel
-clf = SVC(kernel='rbf')
-clf.fit(X_train,y_train)
-print("RBF SVC Training score: {}".format(clf.score(X_train,y_train)))
-print("RBF SVC Training F1 score: {}".format( f1_score(y_train, clf.predict(X_train),average='weighted')))
-print("RBF SVC Test score: {}".format(clf.score(X_test,y_test)))
-y_test_pred = clf.predict(X_test)
-print("RBF SVC Test F1 score: {}".format( f1_score(y_test, y_test_pred,average='weighted')))
-print()
+#clf = SVC(kernel='rbf')
+#clf.fit(X_train,y_train)
+#print("RBF SVC Training score: {}".format(clf.score(X_train,y_train)))
+#print("RBF SVC Training F1 score: {}".format( f1_score(y_train, clf.predict(X_train),average='weighted')))
+#print("RBF SVC Test score: {}".format(clf.score(X_test,y_test)))
+#y_test_pred = clf.predict(X_test)
+#print("RBF SVC Test F1 score: {}".format( f1_score(y_test, y_test_pred,average='weighted')))
+#print()
+#print("RBF SVC")
+#scores = run_kfolds(X_train, y_train, SVC, kernel='rbf', probability= True)
+#print("Final scores")
+#print(scores)
+
 
 # get the confusion matrix and plot for the RBF
-cnf_matrix = confusion_matrix(y_test, y_test_pred) #, labels=output_class)
-print(np.sum(np.sum(cnf_matrix)))
-#y_test
+#cnf_matrix = confusion_matrix(y_test, y_test_pred) #, labels=output_class)
+#print(np.sum(np.sum(cnf_matrix)))
+
 
 #print("Verification of Confusion matrix")
 #for i in output_class:
@@ -232,8 +303,9 @@ print(np.sum(np.sum(cnf_matrix)))
 #        matrix_val = np.dot((y_test==i)*1.,(y_test_pred == j)*1)
 #        print("{} but predicts {}:  {}".format(i,j,matrix_val))
 
-print()
-print(cnf_matrix)
+#print()
+#print(cnf_matrix)
+#print()
 
 debug =False
 if debug:
@@ -305,7 +377,6 @@ print("shape of X: {}".format(X.shape))
 X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.25, random_state=14)
 
 ## lets try with PCA
-from sklearn.decomposition import PCA
 pca = PCA(n_components=28)
 pca = pca.fit(X)
 #X = pca.transform(X)
@@ -379,7 +450,7 @@ print()
 
 
 #http://scikit-learn.org/stable/auto_examples/linear_model/plot_sgd_iris.html
-from sklearn import linear_model
+
 clf = linear_model.SGDClassifier(alpha=0.001, n_iter=100)
 clf.fit(X_train,y_train)
 print("SGD Training score: {}".format(clf.score(X_train,y_train)))
@@ -388,7 +459,6 @@ print("SGD Test score: {}".format(clf.score(X_test,y_test)))
 y_test_pred = clf.predict(X_test)
 print("SGD Test F1 score: {}".format( f1_score(y_test, y_test_pred,average='weighted')))
 print()
-
 
 
 # get the confusion matrix and plot for the RBF
@@ -743,22 +813,12 @@ print("Unique target labels:", np.unique(y))
 #matches_ml['home_team_points'].isnull().any()
 np.sum(np.isinf(X)*1)
 
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier as RF
 from sklearn.neighbors import KNeighborsClassifier as KNN
 from sklearn.linear_model import LogisticRegression as LR
 from sklearn.ensemble import GradientBoostingClassifier as GBC
 from sklearn.metrics import average_precision_score
-
-
 
 
 print("Logistiic Regression:")
