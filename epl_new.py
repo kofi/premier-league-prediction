@@ -49,8 +49,6 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import confusion_matrix
 
 
-
-
 # Input data files are available in the "../input/" directory.
 # For example, running this (by clicking run or pressing Shift+Enter) will list the files in the input directory
 
@@ -58,29 +56,29 @@ from sklearn.metrics import confusion_matrix
 #print(check_output(["ls", "../input"]).decode("utf8"))
 
 # Any results you write to the current directory are saved as output.
-all_seasons=['2008/2009','2009/2010','2010/2011','2011/2012',
-    '2012/2013','2013/2014','2014/2015','2015/2016']
+all_seasons=['2009/2010','2010/2011','2011/2012',
+    '2013/2014','2014/2015','2015/2016'] # '2012/2013', '2008/2009',
 predictors = []
 #clfs = ['SVR','LinearSVR']  #,'Lasso','RF','KNN']
 nfolds = 5
 
 def get_scores(clf, X, y):
-	gen_score = clf.score(X,y)
-	f1 = f1_score(y, clf.predict(X),average='weighted')
-	ll = log_loss(y,clf.predict_proba(X))
-	scores =  {'score': gen_score, 'f1_score': f1, 'log_loss': ll}
-	#print("{0} score:{score}, f1 score:{f1_score}, logloss:{log_loss}".format(type(clf).__name__,**scores))
-
-	#print("{} Training score: {}".format(clf.__name__, clf.score(X_train,y_train)))
-	#print("RBF SVC Training F1 score: {}".format( f1_score(y_train, clf.predict(X_train),average='weighted')))
-	#print("RBF SVC Test score: {}".format(clf.score(X_test,y_test)))
-	#y_test_pred = clf.predict(X_test)
-	#print("RBF SVC Test F1 score: {}".format( f1_score(y_test, y_test_pred,average='weighted')))
-
-	return scores
+    '''
+        compute and return the scores a given classifier and dataset
+    '''
+    gen_score = clf.score(X,y)
+    f1 = f1_score(y, clf.predict(X),average='weighted')
+    ll = log_loss(y,clf.predict_proba(X))
+    scores =  {'score': gen_score, 'f1_score': f1, 'log_loss': ll}
+    #print("{0} score:{score}, f1 score:{f1_score}, logloss:{log_loss}".format(type(clf).__name__,**scores))
+    return scores
 
 
 def run_kfolds(X,y,clf_class,**kwargs):
+    '''
+        Run K-Folds for a given classifier and dataset
+        Also computes relevant scores and returns them
+    '''
     # Construct a kfolds object
     kf = KFold(n_splits=nfolds,shuffle=True)
     y_pred = y.copy()
@@ -113,11 +111,36 @@ def run_kfolds(X,y,clf_class,**kwargs):
         scores['clf'] = ("{}_{}".format(scores['clf'],kwargs['kernel']))
     return scores
 
-def get_random_seasons(n_seasons):
-    return [all_seasons[i] for i in random.sample(range(len(all_seasons)),n_seasons)]
+def get_random_seasons(nseasons):
+    '''
+        Get a list of n_seasons random seasons 
+    '''
+    seasons = [all_seasons[i] for i in random.sample(range(len(all_seasons)),nseasons)]
+    print(seasons)
+    #assert(-1==1)
+    return seasons
+def get_firstn_seasons(nseasons):
+    '''
+        Get a list of the first nseasons
+    '''
+    print(all_seasons[0:nseasons])
+    return all_seasons[0:nseasons] 
+
+def get_nth_seasons(nseasons):
+    '''
+        Get a list of the nseasons_th season
+    '''
+    print(all_seasons[nseasons-1])
+    return [all_seasons[nseasons-1]] 
 
     
-def matches_for_analysis(n_seasons):
+def matches_for_analysis(nseasons, season_select='firstn',filter_team=None, compute_form= False,
+                        window=3):
+    
+    season_selectors = {
+        'random':get_random_seasons, 
+        'nth':get_nth_seasons,
+        'firstn':get_firstn_seasons}
 
     # create the connection to the database
     con = None
@@ -131,27 +154,41 @@ def matches_for_analysis(n_seasons):
     # get the leagues
     query = "select * from League"
     leagues = pd.read_sql(query,con=con)
-    my_team = 'Liverpool'
-    my_team_info = h.get_team_id(my_team)
+    #my_team = 'Liverpool'
+    #my_team_info = h.get_team_id(filter_team)
     #print(my_team_info['team_api_id'])
-    my_team_id = my_team_info['team_api_id'][0]
+    my_team_id = h.get_team_id(filter_team)['team_api_id'][0]
     #print(my_team_id)
-
-    season = None #get_random_seasons(n_seasons) #['2010/2011','2011/2012','2012/2013','2013/2014']
+    
+    season = season_selectors.get(season_select,get_nth_seasons)(nseasons) 
+    # get_random_seasons(nseasons) #['2010/2011','2011/2012','2012/2013','2013/2014']
     matches = h.preprocess_matches_for_season(season)
+    matches_with_form = h.preprocess_matches_for_season(None,compute_form=compute_form,window=window)
+    print("Matches shape A {}".format(matches.shape))
+    print("Matches shape B {}".format(matches_with_form.shape))
     # filter out only the matches with the team of interest
-    #matches = matches[(matches['home_team_api_id'] == my_team_id)  | (matches['away_team_api_id'] == my_team_id)]
+    if filter_team:
+        matches = matches[(matches['home_team_api_id'] == my_team_id)  | (matches['away_team_api_id'] == my_team_id)]
     # set the home status of the team of interest
     #matches.loc[matches['home_team_api_id'] == my_team_id,'isteamhome'] = 1
     #matches.loc[matches['home_team_api_id'] != my_team_id,'isteamhome'] = 0
 
+
+
     #print("Shape before cleanup and encode: {}".format(matches.shape))
     matches = h.clean_up_matches(matches)
+    #print("Matches shape B before encode {}".format(matches.shape))
     matches = h.encode_matches(matches)
+    #print("Matches shape C after encode {}".format(matches.shape))
     #matches.describe()
     #matches.info()
-    #print(matches.columns.T)
+    #print(matches)
     #print("Shape after cleanup and encode: {}".format(matches.shape))
+
+    #matches.head()
+    #cols = ['home_team_goal','away_team_goal', 'home_team_outcome','home_team_points'] #,'isteamhome']
+    #matches[cols].tail()
+    #print(matches.columns.T)
 
     # create the output columns
     matches['home_team_points'] = 3*(matches['home_team_goal'] > matches['away_team_goal']) + \
@@ -162,11 +199,6 @@ def matches_for_analysis(n_seasons):
     matches['home_team_outcome'] = 'draw'
     matches.loc[matches['home_team_goal'] > matches['away_team_goal'],['home_team_outcome']] = 'win'
     matches.loc[matches['home_team_goal'] < matches['away_team_goal'],['home_team_outcome']] = 'lose'
-    #matches.info()
-
-    matches.head()
-    cols = ['home_team_goal','away_team_goal', 'home_team_outcome','home_team_points'] #,'isteamhome']
-    matches[cols].tail()
 
     # get some statistics
     # home team win percentages
@@ -174,81 +206,162 @@ def matches_for_analysis(n_seasons):
     percent_home_loss = np.sum(matches['home_team_points'] == 0)/(1. * np.max(matches.shape[0]))
     percent_home_draw = np.sum(matches['home_team_points'] == 1)/(1. * np.max(matches.shape[0]))
     win_stats = [percent_home_win, percent_home_loss, percent_home_draw]
-    matches_entropy = -np.sum([k*math.log(k,3) for k in win_stats])
+    matches_entropy = -np.sum([k*math.log(k,2) for k in win_stats])
     print("Home team {:.3f} wins, {:.2f} losses, {:.2f} draws".format(
             100*percent_home_win,100*percent_home_loss,100*percent_home_draw))
     print("Matches entropy: {:f}".format(matches_entropy))
-    #print()
+    print()
 
     # drop Nan rows
     allnas = matches.isnull().any()
-    #print(allnas)
 
     if (sum(allnas == True)):
         matches.dropna(inplace=True)
-
+    #print("Shape of X after dropna: {}".format(matches.shape))
     #print("Dataframe shape after dropping rows {}".format(matches.shape))
 
     # define the output variable
     y = np.array(matches['home_team_outcome'])
-    #print("Unique Y ", matches['home_team_outcome'].unique())
 
     # then delete columns
-    matches_hm_goals = matches.drop(['home_team_points','home_team_goal',
+    matches_sub = matches.drop(['match_id','home_team_points','home_team_goal',
                                     'away_team_goal','home_team_outcome'], axis=1)
 
     # finally transform the data and scale to normalize
-    X = np.array(StandardScaler().fit_transform(matches_hm_goals)) 
-    #print("Shape of X after scaling: {}".format(X.shape))
+    try:
+        X = np.array(StandardScaler().fit_transform(matches_sub)) 
+        #print("Shape of X after scaling: {}".format(X.shape))
+    except Exception:
+        matches = None
+        matches_sub = None
+        X = None
+        y = None
 
-    return {'rawdata':matches, 'data':matches_hm_goals, 'X':X, 'y':y}
+
+    return {'rawdata':matches, 'data':matches_sub, 'X':X, 'y':y, 'entropy': matches_entropy}
 
 
-
-if __name__ == '__main__':
+def analysis_1(i, matches_data,pipeline_pca=False,debug=False):
+    '''
+        first analysis to identify best performing classifiers for further tuning
+    '''
+    X = output['X']
+    y = output['y']
+    if X is None or y is None:
+        return []
     
-    for i in range(1,2): #len(all_seasons)): 
-        output = matches_for_analysis(i)
-        X = output['X']
-        y = output['y']
-        matches = output['rawdata']
-        model_matches = output['data']
+    #  save the entropy
+    #all_entropies.append(output['entropy'])
+    #matches = output['rawdata']
+    #model_matches = output['data']
+    
+    if pipeline_pca:
+        if debug :
+            print("Shape of X before PCA: {}".format(X.shape)) 
         # lets try with PCA
-        pca = PCA(n_components=28)
-        pca = pca.fit(X)
+        pca = PCA(n_components=62) #28)
+        pca = pca.fit(X) 
         X = pca.transform(X)
-        print("Shape of X after PCA: {}".format(X.shape))
+        if debug :
+            print("Shape of X after PCA: {}".format(X.shape)) 
 
         #print("Percent explain variance")
         #print(100*pca.explained_variance_ratio_)
 
-        # first split the data
-        #from sklearn.model_selection import train_test_split
-        #X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.25, random_state=14)
+    # ... get the training score
+    #clfs = [{'clf': SVC, 'params':{'kernel':'rbf', 'probability':True}}]
+    clfs = [{'clf': DummyClassifier, 'params':{'strategy':'most_frequent','random_state':0}},
+            {'clf': SVC, 'params':{'kernel':'linear', 'probability':True}},
+                {'clf': SVC, 'params':{'kernel':'rbf', 'probability':True}},
+                {'clf': DecisionTreeClassifier, 'params':{'random_state':0}},
+                {'clf': GNB, 'params':{}},
+                {'clf': SGDClassifier, 'params':{'loss':'log','alpha':0.001,'n_iter':100}}]
+    all_scores = []
+    for k in clfs:
+        scores = run_kfolds(X,y,k['clf'], **k['params'])
+        scores['entropy'] = matches_data['entropy']
+        scores['seasons'] = i
+        all_scores.append(scores)
 
-        #matches_hm_goals.info()
-        #print()
+    df_scores = pd.DataFrame(all_scores)
+    df_scores.set_index('clf', inplace=True)
+    #print(df_scores)
 
-        # ... get the training score
-        clfs = [{'clf': SVC, 'params':{'kernel':'rbf', 'probability':True}}]
-        # clfs = [{'clf': DummyClassifier, 'params':{'strategy':'most_frequent','random_state':0}},
-        #         {'clf': SVC, 'params':{'kernel':'linear', 'probability':True}},
-        #             {'clf': SVC, 'params':{'kernel':'rbf', 'probability':True}},
-        #             {'clf': DecisionTreeClassifier, 'params':{'random_state':0}},
-        #             {'clf': GNB, 'params':{}},
-        #             {'clf': SGDClassifier, 'params':{'loss':'log','alpha':0.001,'n_iter':100}}]
-        all_scores = []
-        for k in clfs:
-            scores = run_kfolds(X,y,k['clf'], **k['params'])
-            all_scores.append(scores)
+    # save the scores
+    #all_runs.append(df_scores.reset_index())
+    if debug:
+        print()
+        agg_cols = ['log_loss','score','f1_score']
+        print(pd.DataFrame({'Max':df_scores[agg_cols].max(axis= 0), 
+                            'ArgMax':df_scores[agg_cols].idxmax(axis= 0),
+                            'Min':df_scores[agg_cols].min(axis= 0), 
+                            'ArgMin':df_scores[agg_cols].idxmin(axis= 0)}))
+
+    print("-------------------------------------------------------------")
+    print()
+
+    return df_scores 
 
 
-        df_scores = pd.DataFrame(all_scores)
-        print(df_scores)
+# plot the analysis 1 data
+def plot_analysis_1(data):
+
+    classifiers = data.unstack()['clf'].unique()
+    scores = ['f1_score','log_loss','score']
+    clcolor =['red','blue','green','black','yellow','pink']
+    fig, ax = plt.subplots(len(scores))
+    pltcnt = 0
+    for s in scores:
+        for c in classifiers:
+            myd = data.loc[dfa['clf'].str.contains(c)] 
+            ax[pltcnt].plot(myd['seasons'], myd[s],'-',label=c)
+        ax[pltcnt].axis('tight')
+        ax[pltcnt].set_xlim(0,len(myd['seasons'])-1)
+        ax[pltcnt].legend(loc='lower center',frameon=False,ncol=len(classifiers))
+        ax[pltcnt].set_xlabel('# of Seasons in data')
+        ax[pltcnt].set_ylabel('Score value')
+        pltcnt = pltcnt + 1
+    plt.show()  
 
 
+
+
+# Run through the sequence of analyses
+if __name__ == '__main__':
+    #print(range(1,len(all_seasons)))
+    #setup a few data structures to store results
+    df_all_runs = pd.DataFrame()
+    all_runs = []
+    all_entropies = []
+    do_plots = False
+    debug = False
+    compute_form = True
+
+    # loop over all data 
+    for i in range(1): #len(all_seasons)): 
+        print(i)
+        output = matches_for_analysis(i+1,season_select='firstn',compute_form=True)
+        df_scores = analysis_1(i, output, pipeline_pca=True,debug=debug)
+        # save the scores
+        all_runs.append(df_scores.reset_index())
+    
+    dfa = pd.concat(all_runs,ignore_index= True) #, keys=range(len(all_seasons)))
+    if debug:
+        print()
+        print("All Runs")
+        print(dfa)
+    if do_plots:
+        lot_analysis_1(dfa)
 
 assert(1==-1)
+
+
+# first split the data
+#from sklearn.model_selection import train_test_split
+#X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.25, random_state=14)
+
+#matches_hm_goals.info()
+#print()
 
 #print("Linear SVC")
 #params = {'kernel':'linear', 'probability':True}

@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 
-def preprocess_matches_for_season(seasons):
+def preprocess_matches_for_season(seasons, compute_form = False, window=3):
     '''
     do all the preprocessing and return a matches dataframe ready 
     for learning
@@ -40,6 +40,8 @@ def preprocess_matches_for_season(seasons):
     matches = get_all_seasons_data(seasons) #matches, team_attributes)
 
     #assert(1==-1)
+    if compute_form:
+        matches = compute_all_forms(matches,window=window)
 
     return matches
 
@@ -83,11 +85,12 @@ def get_matches_for_season(season=None):
     query = "select * from League where name like '%England%'"
     eplinfo = pd.read_sql(query, con=con)
 
-    if (season is not None) and len(season)==1:
+    if (season is not None):   #and len(season)==1:
         query = "Select * from Match \
-                where league_id = {} and season='{}'".format(eplinfo['id'][0], season[0])
+                where league_id = {} and season='{}'".format(eplinfo['id'][0], season)
     else:
         query = "Select * from Match where league_id = {} ".format(eplinfo['id'][0])
+    #print(query)
     matches = pd.read_sql(query, con=con)
 
     return matches
@@ -99,7 +102,10 @@ def get_matches_for_seasons(seasons):
     if seasons is None:
         return get_matches_for_season(season = None)
     start_season = seasons[0]
+    #print(start_season)
     matches = get_matches_for_season(start_season)
+    #print(seasons)
+    #print(matches.shape)
     for s in range(1,len(seasons)):
         matches = matches.append(get_matches_for_season(seasons[s]), ignore_index=True)
         #print(matches.shape)
@@ -113,11 +119,10 @@ def get_attributes_for_seasons(seasons):
         return get_attributes_for_season(season=None)
     start_season = seasons[0]
     attrs = get_attributes_for_season(start_season)
-    #print(attrs.columns.T)
-    #print("attributes shape {}".format(*attrs.shape))
+
     for s in range(1,len(seasons)):
         attrs = attrs.append(get_attributes_for_season(seasons[s]), ignore_index=True)
-        #print("attributes shape {}".format(*attrs.shape))
+
     return attrs
 
 def get_attributes_for_season(season=None):
@@ -191,14 +196,13 @@ def merge_matches_attributes(matches, team_attributes):
                         'defencePressureClass':'away_defencePressureClass','defenceAggression':'away_defenceAggression',
                         'defenceAggressionClass':'away_defenceAggressionClass','defenceTeamWidth':'away_defenceTeamWidth',
                         'defenceTeamWidthClass':'away_defenceTeamWidthClass','defenceDefenderLineClass':'away_defenceDefenderLineClass'}, inplace=True)
+    
     #print(matches.columns)
-
     ## create the output variables
     # matches['home_team_points'] = 3*(matches['home_team_goal'] > matches['away_team_goal']) + 1*(matches['home_team_goal'] == matches['away_team_goal'])
     # matches['home_team_outcome'] = 'draw'
     # matches.loc[matches['home_team_goal'] > matches['away_team_goal'],['home_team_outcome']] = 'win'
     # matches.loc[matches['home_team_goal'] < matches['away_team_goal'],['home_team_outcome']] = 'lose'
-
 
     #print win_idx
     #matches = matches.lambda(:)
@@ -218,15 +222,15 @@ def clean_up_matches(matches):
     also drop some additioonal columns: either ids or 
     '''
     matches.index = matches['match_id']
-    #print(matches.shape)
+    #print(matches.columns.T)
     # then drop the match_id and also drop stage for now
-    to_drop = [ 'match_id', 'stage', 'match_date','home_team_api_id',
+    to_drop = [ 'stage', 'match_date','home_team_api_id',
             'away_team_api_id','home_team', 'away_team','season',
             'home_buildUpPlayDribbling','away_buildUpPlayDribbling']  
     #'home_team_goal', 'away_team_goal',
     # make a copy of the matches dataframe and drop the appropriate fields while deleting the unneeded features
     matches = matches.drop(to_drop, axis =1)
-    #print(matches.shape)
+    #print("Matches shape after clean up {}".format(matches.shape))
 
     return matches
 
@@ -236,20 +240,24 @@ def encode_matches(matches):
     '''
     # get categorical data ...
     cat_list= matches.select_dtypes(include=['object']).columns.tolist()
+    #matches.info()
+    #print("cat list: {}".format(cat_list))
     # then encode those columns ...
     matches = pd.get_dummies(matches, prefix=cat_list)
-
+    #print("Matches shape after encode up {}".format(matches.shape))
     return matches
     
 def get_all_seasons_data(seasons): #matches,tattr):
     '''
     get the number of unique seasons in the matches dataframe
     '''
-    matches = get_matches_for_seasons(seasons) # if seasons else get_matches_for_season(seasons)   
+    matches = get_matches_for_seasons(seasons) # if seasons else get_matches_for_season(seasons)  
+    #print("matches shape 1 {}".format(matches.shape) )
     matches = matches[matches.columns[:11]]
-
+    #print("matches shape 2 {}".format(matches.shape))
     # get attributes
     tattr = get_attributes_for_seasons(seasons)
+    
 
     if seasons is None:
         seasons = matches['season'].unique()
@@ -261,9 +269,8 @@ def get_all_seasons_data(seasons): #matches,tattr):
     for e in seasons:
 
         # get the corresponding matches
-        print(e)
+        #print(e)
         m = matches[matches['season'] == e]
-        #print(m.shape)
 
         # get the corresponding attributes
         [sstart, ssend] = e.split('/')
@@ -272,36 +279,14 @@ def get_all_seasons_data(seasons): #matches,tattr):
         t = tattr[(tattr['date'] >= get_season_as_date(sstart)) & 
                 (tattr['date'] < get_season_as_date(ssend))]
 
-        # # do the on the home team
-        # m = pd.merge(left=m, right=t, how='left', left_on='home_team_api_id',right_on='team_api_id')
-        # #print m.info()
-        # dropcols = ['country_id','league_id','id_y','team_api_id','team_fifa_api_id','team_short_name']
-        # dropcols = [c for c in dropcols if c in m.index]
-        # m = m.drop(dropcols, axis=1)
-        # m.rename(columns={'id_x':'match_id','date':'match_date', 'team_long_name':'home_team'}, 
-        #                 inplace=True)
-
-        # # then merge again on the away team
-        # m = pd.merge(left=m, right=t, how='left', left_on='away_team_api_id', right_on='team_api_id')
-        # dropcols = ['id', 'match_api_id', 'team_fifa_api_id', 'team_short_name']
-        # dropcols = [c for c in dropcols if c in m.index]
-        # m = m.drop(dropcols, axis=1)
-        # m.rename(columns={'team_long_name':'away_team'}, inplace=True)
-
         m = merge_matches_teams(m, teams)
         m = merge_matches_attributes(m, t)
-
-        # then append to newmatches
-        #if newmatches.shape[0] == 0:
-        #    newmatches = m.copy()
-        #    #print newmatches.shape
-        #else:
+        
         newmatches = newmatches.append(m, ignore_index=False)
-        #print(newmatches.shape)
-        #    print m.shape
-        #    print newmatches.shape
-        #print m
     
+    
+    #print("New Matches shape {}".format(newmatches.shape))
+
 
     return newmatches
 
@@ -312,6 +297,61 @@ def get_all_seasons_data(seasons): #matches,tattr):
 #nm.rename(columns={'team_long_name':'away_team'}, inplace=True)
 #print(nm.shape)
 #nm.head(15)
+
+def compute_all_forms(matches,window=3):
+    #print(matches.info())
+    #print(matches.columns.T)
+    sorted_matches = matches.sort_values(by=['match_id'],axis=0)
+    unique_teams = matches['home_team_api_id'].unique()
+    nmatches = matches.shape[0]
+    matches['home_team_win_average'] = 0.0
+    matches['home_team_draw_average'] = 0.0
+    matches['home_team_lose_average'] = 0.0
+    matches['away_team_win_average'] = 0.0
+    matches['away_team_draw_average'] = 0.0
+    matches['away_team_lose_average'] = 0.0
+
+    matches['home_team_won'] = 1*(matches['home_team_goal'] > matches['away_team_goal']) 
+    matches['home_team_drew'] = 1*(matches['home_team_goal'] == matches['away_team_goal']) 
+    matches['home_team_lost'] = 1*(matches['home_team_goal'] < matches['away_team_goal'])
+    matches['away_team_won'] = 1*(matches['home_team_goal'] < matches['away_team_goal']) 
+    matches['away_team_lost'] = 1*(matches['home_team_goal'] > matches['away_team_goal']) 
+    matches['away_team_drew'] = 1*(matches['home_team_goal'] == matches['away_team_goal']) 
+
+    in_cols = ['home_team_won','home_team_drew','home_team_lost', 'away_team_won','away_team_drew','away_team_lost']
+    print("Matches shape D {}".format(matches.shape))
+    for t in unique_teams:
+        print(t)
+        # get the indexes
+        mloc = matches[(matches['home_team_api_id'] == t)  | (matches['away_team_api_id'] == t)].index
+        #print(mloc) #matches.loc[mloc])
+        #assert(-1==1)
+        mloc_away =  matches.loc[(matches['home_team_api_id'] == t)]
+        mloc_home =  matches.loc[(matches['away_team_api_id'] == t)]#.index
+        tmatched = matches.loc[mloc]
+        print(tmatched)
+        curr_form = tmatched[in_cols].rolling(window,win_type='triang').sum() / (1.0*window)
+        curr_form.fillna(0,inplace= True)
+        #curr_form.reset_index(inplace= True)
+        print(curr_form)
+        for l in mloc_away:
+            #print(l)
+            matches.loc[l,'away_team_win_average'] = curr_form.ix[l]['away_team_won']
+            matches.loc[l,'away_team_draw_average'] = curr_form.ix[l]['away_team_drew']
+            matches.loc[l,'away_team_lose_average'] = curr_form.ix[l]['away_team_lost']
+            #matches.loc[l,'away_form'] = 3*curr_form.ix[l]['away_team_won'] + 1curr_form.ix[l]['away_team_lost']
+
+        for l in mloc_home:
+            matches.loc[l,'home_team_win_average'] = curr_form.ix[l]['home_team_won']
+            matches.loc[l,'home_team_draw_average'] = curr_form.ix[l]['home_team_drew']
+            matches.loc[l,'home_team_lose_average'] = curr_form.ix[l]['home_team_lost']
+
+        #print(matches.loc[mloc])
+        #assert(-1==1)
+    matches = matches.drop(in_cols, axis =1)
+
+    return matches
+
 
 def plot_confusion_matrix(cm, classes,
                           normalize=False,
