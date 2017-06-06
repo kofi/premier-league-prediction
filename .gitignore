@@ -4,3 +4,4 @@ input/*
 ../input/*
 *~
 *.bak*
+*.p*

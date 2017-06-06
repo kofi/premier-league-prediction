@@ -2,11 +2,11 @@
 # coding: utf-8
 
 # # Exploring how team attributes impact scores in the premier league
-# ## Merge the match and (winning) team data to evaluate which team features most impact 
+# ## Merge the match and (winning) team data to evaluate which team features most impact
 
 # This Python 3 environment comes with many helpful analytics libraries installed
 # It is defined by the kaggle/python docker image: https://github.com/kaggle/docker-python
-# For example, here's several helpful packages to load in 
+# For example, here's several helpful packages to load in
 import sys
 #from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QVBoxLayout, QSizePolicy, QMessageBox, QWidget, QPushButton
 #from PyQt5.QtGui import QIcon
@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 
 #******************************************************************
 #from PyQt5 import QtCore
-import seaborn as sbn 
+import seaborn as sbn
 sbn.set()
 import helpers as h
 import sys
@@ -48,6 +48,8 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import confusion_matrix
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # Input data files are available in the "../input/" directory.
 # For example, running this (by clicking run or pressing Shift+Enter) will list the files in the input directory
@@ -61,6 +63,8 @@ all_seasons=['2009/2010','2010/2011','2011/2012',
 predictors = []
 #clfs = ['SVR','LinearSVR']  #,'Lasso','RF','KNN']
 nfolds = 5
+
+
 
 def get_scores(clf, X, y):
     '''
@@ -83,7 +87,7 @@ def run_kfolds(X,y,clf_class,**kwargs):
     kf = KFold(n_splits=nfolds,shuffle=True)
     y_pred = y.copy()
     scores = None
-    cnf_matrix = None 
+    cnf_matrix = None
     clf = None
     # Iterate through folds
     for train_index, test_index in kf.split(X):
@@ -113,59 +117,45 @@ def run_kfolds(X,y,clf_class,**kwargs):
 
 def get_random_seasons(nseasons):
     '''
-        Get a list of n_seasons random seasons 
+        Get a list of n_seasons random seasons
     '''
     seasons = [all_seasons[i] for i in random.sample(range(len(all_seasons)),nseasons)]
-    print(seasons)
+    #print(seasons)
     #assert(-1==1)
     return seasons
 def get_firstn_seasons(nseasons):
     '''
         Get a list of the first nseasons
     '''
-    print(all_seasons[0:nseasons])
-    return all_seasons[0:nseasons] 
+    #print(all_seasons[0:nseasons])
+    return all_seasons[0:nseasons]
 
 def get_nth_seasons(nseasons):
     '''
         Get a list of the nseasons_th season
     '''
-    print(all_seasons[nseasons-1])
-    return [all_seasons[nseasons-1]] 
+    #print(all_seasons[nseasons-1])
+    return [all_seasons[nseasons-1]]
 
-    
+
 def matches_for_analysis(nseasons, season_select='firstn',filter_team=None, compute_form= False,
                         window=3):
-    
+
     season_selectors = {
-        'random':get_random_seasons, 
+        'random':get_random_seasons,
         'nth':get_nth_seasons,
         'firstn':get_firstn_seasons}
 
-    # create the connection to the database
-    con = None
-    con = sql.connect('../input/database.sqlite')
-    # create the cursor
-    cur= con.cursor()
-    # select only the information for the EPL
-    #   - changed from sqlite interface to use pd.read_sql
-    query = "select * from League where name like '%England%'"
-    eplinfo = pd.read_sql(query,con=con) 
-    # get the leagues
-    query = "select * from League"
-    leagues = pd.read_sql(query,con=con)
-    #my_team = 'Liverpool'
-    #my_team_info = h.get_team_id(filter_team)
-    #print(my_team_info['team_api_id'])
-    my_team_id = h.get_team_id(filter_team)['team_api_id'][0]
-    #print(my_team_id)
-    
-    season = season_selectors.get(season_select,get_nth_seasons)(nseasons) 
+    if filter_team:
+        my_team_id = h.get_team_id(filter_team)
+
+    season = season_selectors.get(season_select,get_nth_seasons)(nseasons)
+    print("Seasons: {}".format(season))
     # get_random_seasons(nseasons) #['2010/2011','2011/2012','2012/2013','2013/2014']
     matches = h.preprocess_matches_for_season(season)
     matches_with_form = h.preprocess_matches_for_season(None,compute_form=compute_form,window=window)
-    print("Matches shape A {}".format(matches.shape))
-    print("Matches shape B {}".format(matches_with_form.shape))
+    #print("Matches shape A {}".format(matches.shape))
+    #print("Matches shape B {}".format(matches_with_form.shape))
     # filter out only the matches with the team of interest
     if filter_team:
         matches = matches[(matches['home_team_api_id'] == my_team_id)  | (matches['away_team_api_id'] == my_team_id)]
@@ -174,10 +164,10 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None, comp
     #matches.loc[matches['home_team_api_id'] != my_team_id,'isteamhome'] = 0
 
 
-
     #print("Shape before cleanup and encode: {}".format(matches.shape))
     matches = h.clean_up_matches(matches)
     #print("Matches shape B before encode {}".format(matches.shape))
+    #print(matches.columns.T)
     matches = h.encode_matches(matches)
     #print("Matches shape C after encode {}".format(matches.shape))
     #matches.describe()
@@ -199,6 +189,7 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None, comp
     matches['home_team_outcome'] = 'draw'
     matches.loc[matches['home_team_goal'] > matches['away_team_goal'],['home_team_outcome']] = 'win'
     matches.loc[matches['home_team_goal'] < matches['away_team_goal'],['home_team_outcome']] = 'lose'
+    #print(matches.columns.T)
 
     # get some statistics
     # home team win percentages
@@ -214,6 +205,7 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None, comp
 
     # drop Nan rows
     allnas = matches.isnull().any()
+    #print(allnas)
 
     if (sum(allnas == True)):
         matches.dropna(inplace=True)
@@ -224,18 +216,21 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None, comp
     y = np.array(matches['home_team_outcome'])
 
     # then delete columns
-    matches_sub = matches.drop(['match_id','home_team_points','home_team_goal',
+
+    matches_sub = matches.drop(['home_team_points','home_team_goal',
                                     'away_team_goal','home_team_outcome'], axis=1)
 
     # finally transform the data and scale to normalize
     try:
-        X = np.array(StandardScaler().fit_transform(matches_sub)) 
+        X = np.array(StandardScaler().fit_transform(matches_sub))
         #print("Shape of X after scaling: {}".format(X.shape))
     except Exception:
+        print("excepted")
         matches = None
         matches_sub = None
         X = None
         y = None
+        raise
 
 
     return {'rawdata':matches, 'data':matches_sub, 'X':X, 'y':y, 'entropy': matches_entropy}
@@ -249,21 +244,16 @@ def analysis_1(i, matches_data,pipeline_pca=False,debug=False):
     y = output['y']
     if X is None or y is None:
         return []
-    
-    #  save the entropy
-    #all_entropies.append(output['entropy'])
-    #matches = output['rawdata']
-    #model_matches = output['data']
-    
+
     if pipeline_pca:
         if debug :
-            print("Shape of X before PCA: {}".format(X.shape)) 
+            print("Shape of X before PCA: {}".format(X.shape))
         # lets try with PCA
-        pca = PCA(n_components=62) #28)
-        pca = pca.fit(X) 
+        pca = PCA() #28)
+        pca = pca.fit(X)
         X = pca.transform(X)
         if debug :
-            print("Shape of X after PCA: {}".format(X.shape)) 
+            print("Shape of X after PCA: {}".format(X.shape))
 
         #print("Percent explain variance")
         #print(100*pca.explained_variance_ratio_)
@@ -290,17 +280,16 @@ def analysis_1(i, matches_data,pipeline_pca=False,debug=False):
     # save the scores
     #all_runs.append(df_scores.reset_index())
     if debug:
-        print()
         agg_cols = ['log_loss','score','f1_score']
-        print(pd.DataFrame({'Max':df_scores[agg_cols].max(axis= 0), 
+        print(pd.DataFrame({'Max':df_scores[agg_cols].max(axis= 0),
                             'ArgMax':df_scores[agg_cols].idxmax(axis= 0),
-                            'Min':df_scores[agg_cols].min(axis= 0), 
+                            'Min':df_scores[agg_cols].min(axis= 0),
                             'ArgMin':df_scores[agg_cols].idxmin(axis= 0)}))
 
-    print("-------------------------------------------------------------")
+    print("-"*100) #"-------------------------------------------------------------")
     print()
 
-    return df_scores 
+    return df_scores
 
 
 # plot the analysis 1 data
@@ -313,7 +302,7 @@ def plot_analysis_1(data):
     pltcnt = 0
     for s in scores:
         for c in classifiers:
-            myd = data.loc[dfa['clf'].str.contains(c)] 
+            myd = data.loc[dfa['clf'].str.contains(c)]
             ax[pltcnt].plot(myd['seasons'], myd[s],'-',label=c)
         ax[pltcnt].axis('tight')
         ax[pltcnt].set_xlim(0,len(myd['seasons'])-1)
@@ -321,34 +310,35 @@ def plot_analysis_1(data):
         ax[pltcnt].set_xlabel('# of Seasons in data')
         ax[pltcnt].set_ylabel('Score value')
         pltcnt = pltcnt + 1
-    plt.show()  
-
-
-
+    plt.show()
 
 # Run through the sequence of analyses
 if __name__ == '__main__':
+
     #print(range(1,len(all_seasons)))
+    print("about to start analysis")
+    h.import_datasets()
     #setup a few data structures to store results
     df_all_runs = pd.DataFrame()
     all_runs = []
     all_entropies = []
     do_plots = False
-    debug = False
-    compute_form = True
+    debug = True
+    compute_form = False
 
-    # loop over all data 
-    for i in range(1): #len(all_seasons)): 
+    # loop over all data
+    for i in range(len(all_seasons)):
         print(i)
-        output = matches_for_analysis(i+1,season_select='firstn',compute_form=True)
-        df_scores = analysis_1(i, output, pipeline_pca=True,debug=debug)
+        output = matches_for_analysis(i+1,season_select='nth',
+                                      compute_form=compute_form)
+        df_scores = analysis_1(i, output, pipeline_pca=False,debug=True)
         # save the scores
         all_runs.append(df_scores.reset_index())
-    
+
     dfa = pd.concat(all_runs,ignore_index= True) #, keys=range(len(all_seasons)))
     if debug:
         print()
-        print("All Runs")
+        print("Summary Results for all iterations:")
         print(dfa)
     if do_plots:
         lot_analysis_1(dfa)
@@ -431,10 +421,10 @@ if debug:
      h.plot_confusion_matrix(cnf_matrix, classes=output_class, normalize=True,
                       title='Normalized Confusion matrix')
 
-     plt.show() 
+     plt.show()
 
 #### Problem seems to be the model is overpredicting one classifier.
-#### Could be a problem due to the unbalanced data set 
+#### Could be a problem due to the unbalanced data set
 #### need to come up with an approach to oversample the smaller categories
 #### and undersample the most frequent class
 
@@ -537,7 +527,7 @@ print("Verification of Confusion matrix")
 #    for j in output_class:
 #        matrix_val = np.dot((y_test==i)*1.,(y_test_pred == j)*1)
 #        print("{} but predicts {}:  {}".format(i,j,matrix_val))
- 
+
 print()
 #print(cnf_matrix)
 cm = cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
@@ -815,11 +805,11 @@ for i in range(3):
 
 
 # Set the match_id to be the dataset key.
-# 
+#
 # It is redundant to keep the home and away teams goals in the analysis since the output (whether the home team wins, loses or draws) is directly dependent on both features. So we'll remove them from the data set or not add them into our feature set. Other fields to exclude from the feature set include the match date (for now), the names of the teams playing etc.
-# 
+#
 # home_buildUpPlayDribbling and away_buildUpPlayDribbling have None entries
-# 
+#
 
 # In[ ]:
 
@@ -845,7 +835,7 @@ for i in range(3):
 # In[ ]:
 
 ##print(matches_ml.columns)
-#from sklearn.preprocessing import OneHotEncoder 
+#from sklearn.preprocessing import OneHotEncoder
 #from sklearn.preprocessing import LabelEncoder
 
 ## pulled in from http://stackoverflow.com/questions/24458645/label-encoding-across-multiple-columns-in-scikit-learn
@@ -894,7 +884,7 @@ for i in range(3):
 #for i in [cat_list]:
 #    print(matches_ml.iloc[[1]][i])
 #    #print("field: {}, value: {}".format(i,v))
-    
+
 
 
 # In[ ]:
@@ -908,7 +898,7 @@ matches_ml.drop(['home_team_points'], axis=1)
 
 from sklearn.preprocessing import StandardScaler
 scaler = StandardScaler()
-X = np.array(scaler.fit_transform(matches_ml))   #np.array(matches_ml) 
+X = np.array(scaler.fit_transform(matches_ml))   #np.array(matches_ml)
 
 
 # In[ ]:
@@ -980,7 +970,7 @@ for i in range(20) :
     if max_score < score:
         max_score = score
         max_clust = n_clusters
-    
+
 print("Maximum cluster size and score: *{}* and *{}* ".format(max_clust, max_score))
 
 from sklearn import metrics
@@ -1006,6 +996,3 @@ print("Silhouette Coefficient: %0.3f"
 
 
 # In[ ]:
-
-
-
