@@ -47,6 +47,7 @@ from sklearn.metrics.pairwise import chi2_kernel
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import confusion_matrix
+from sklearn.metrics import classification_report
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -63,6 +64,7 @@ all_seasons=['2009/2010','2010/2011','2011/2012',
 predictors = []
 #clfs = ['SVR','LinearSVR']  #,'Lasso','RF','KNN']
 nfolds = 5
+output_class = np.array(['draw','lose','win'])
 
 
 
@@ -106,7 +108,7 @@ def run_kfolds(X,y,clf_class,**kwargs):
         else:
             for k,v in scores.items():
                 scores[k] = scores[k]+ local_score[k]
-    cnf_matrix = confusion_matrix(y_test, clf.predict(X_test))
+    #cnf_matrix = confusion_matrix(y_test, clf.predict(X_test))
 
     # compute the average scores across all folds
     scores = {k: v/(nfolds *1.0) for k,v in scores.items()}
@@ -138,8 +140,8 @@ def get_nth_seasons(nseasons):
     return [all_seasons[nseasons-1]]
 
 
-def matches_for_analysis(nseasons, season_select='firstn',filter_team=None, compute_form= False,
-                        window=3):
+def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
+                compute_form= False, window=3):
 
     season_selectors = {
         'random':get_random_seasons,
@@ -152,13 +154,15 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None, comp
     season = season_selectors.get(season_select,get_nth_seasons)(nseasons)
     print("Seasons: {}".format(season))
     # get_random_seasons(nseasons) #['2010/2011','2011/2012','2012/2013','2013/2014']
-    matches = h.preprocess_matches_for_season(season)
-    matches_with_form = h.preprocess_matches_for_season(None,compute_form=compute_form,window=window)
+    #matches = h.preprocess_matches_for_season(season)
+    matches = h.preprocess_matches_for_season(season,compute_form=compute_form,
+                            window=window)
     #print("Matches shape A {}".format(matches.shape))
     #print("Matches shape B {}".format(matches_with_form.shape))
     # filter out only the matches with the team of interest
     if filter_team:
-        matches = matches[(matches['home_team_api_id'] == my_team_id)  | (matches['away_team_api_id'] == my_team_id)]
+        matches = matches[(matches['home_team_api_id'] == my_team_id)  |
+                          (matches['away_team_api_id'] == my_team_id)]
     # set the home status of the team of interest
     #matches.loc[matches['home_team_api_id'] == my_team_id,'isteamhome'] = 1
     #matches.loc[matches['home_team_api_id'] != my_team_id,'isteamhome'] = 0
@@ -167,7 +171,7 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None, comp
     #print("Shape before cleanup and encode: {}".format(matches.shape))
     matches = h.clean_up_matches(matches)
     #print("Matches shape B before encode {}".format(matches.shape))
-    #print(matches.columns.T)
+
     matches = h.encode_matches(matches)
     #print("Matches shape C after encode {}".format(matches.shape))
     #matches.describe()
@@ -176,7 +180,8 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None, comp
     #print("Shape after cleanup and encode: {}".format(matches.shape))
 
     #matches.head()
-    #cols = ['home_team_goal','away_team_goal', 'home_team_outcome','home_team_points'] #,'isteamhome']
+    #cols = ['home_team_goal','away_team_goal', 'home_team_outcome',
+    #           'home_team_points'] #,'isteamhome']
     #matches[cols].tail()
     #print(matches.columns.T)
 
@@ -185,22 +190,23 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None, comp
                 1*(matches['home_team_goal'] == matches['away_team_goal'])
 
     # define the output classes
-    output_class = np.array(['draw','lose','win'])
+
     matches['home_team_outcome'] = 'draw'
-    matches.loc[matches['home_team_goal'] > matches['away_team_goal'],['home_team_outcome']] = 'win'
-    matches.loc[matches['home_team_goal'] < matches['away_team_goal'],['home_team_outcome']] = 'lose'
-    #print(matches.columns.T)
+    matches.loc[matches['home_team_goal'] > matches['away_team_goal'],
+                            ['home_team_outcome']] = 'win'
+    matches.loc[matches['home_team_goal'] < matches['away_team_goal'],
+                            ['home_team_outcome']] = 'lose'
 
     # get some statistics
     # home team win percentages
-    percent_home_win = np.sum(matches['home_team_points'] == 3)/(1. * np.max(matches.shape[0]))
+    percent_home_win = np.sum(matches['home_team_points'] == 3) /(1. * np.max(matches.shape[0]))
     percent_home_loss = np.sum(matches['home_team_points'] == 0)/(1. * np.max(matches.shape[0]))
     percent_home_draw = np.sum(matches['home_team_points'] == 1)/(1. * np.max(matches.shape[0]))
     win_stats = [percent_home_win, percent_home_loss, percent_home_draw]
     matches_entropy = -np.sum([k*math.log(k,2) for k in win_stats])
-    print("Home team {:.3f} wins, {:.2f} losses, {:.2f} draws".format(
-            100*percent_home_win,100*percent_home_loss,100*percent_home_draw))
-    print("Matches entropy: {:f}".format(matches_entropy))
+    #print("Home team {:.3f} wins, {:.2f} losses, {:.2f} draws".format(
+    #        100*percent_home_win,100*percent_home_loss,100*percent_home_draw))
+    #print("Matches entropy: {:f}".format(matches_entropy))
     print()
 
     # drop Nan rows
@@ -210,6 +216,7 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None, comp
     if (sum(allnas == True)):
         matches.dropna(inplace=True)
     #print("Shape of X after dropna: {}".format(matches.shape))
+    #print(matches.columns.T)
     #print("Dataframe shape after dropping rows {}".format(matches.shape))
 
     # define the output variable
@@ -218,7 +225,8 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None, comp
     # then delete columns
 
     matches_sub = matches.drop(['home_team_points','home_team_goal',
-                                    'away_team_goal','home_team_outcome'], axis=1)
+                        'away_team_goal','home_team_outcome'], axis=1)
+    #print("Shape of matches after drop columns: {}".format(matches_sub.shape))
 
     # finally transform the data and scale to normalize
     try:
@@ -233,7 +241,34 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None, comp
         raise
 
 
-    return {'rawdata':matches, 'data':matches_sub, 'X':X, 'y':y, 'entropy': matches_entropy}
+    return {'rawdata':matches, 'data':matches_sub, 'X':X,
+                'y':y, 'entropy': matches_entropy}
+
+
+def print_confmatrix(y, y_pred):
+    cnf_matrix = confusion_matrix(y, y_pred) #, labels=output_class)
+    print(cnf_matrix)
+    debug =False
+    if debug:
+         np.set_printoptions(precision=2)
+         plt.figure()
+         h.plot_confusion_matrix(cnf_matrix, classes=output_class,
+                          title='Confusion matrix, without normalization')
+
+         plt.figure()
+         h.plot_confusion_matrix(cnf_matrix, classes=output_class, normalize=True,
+                          title='Normalized Confusion matrix')
+
+         plt.show()
+    # print(np.sum(np.sum(cnf_matrix)))
+    # #print("Verification of Confusion matrix")
+    # for i in output_class:
+    #     for j in output_class:
+    #         matrix_val = np.dot((y==i)*1.,(y_pred == j)*1)
+    #         print("{} but predicts {}:  {}".format(i,j,matrix_val))
+    #
+    # print()
+    # print(cnf_matrix)
 
 
 def analysis_1(i, matches_data,pipeline_pca=False,debug=False):
@@ -272,6 +307,12 @@ def analysis_1(i, matches_data,pipeline_pca=False,debug=False):
         scores['entropy'] = matches_data['entropy']
         scores['seasons'] = i
         all_scores.append(scores)
+        clf = k['clf'](**k['params'])
+        print(clf.__class__.__name__ + k['params'].get('kernel',''))
+        if clf.__class__.__name__ in ["SVC","DecisionTreeClassifier"]:
+            y_pred = clf.fit(X,y).predict(X)
+            print_confmatrix(y,y_pred)
+            print(classification_report(y, y_pred))
 
     df_scores = pd.DataFrame(all_scores)
     df_scores.set_index('clf', inplace=True)
@@ -285,8 +326,7 @@ def analysis_1(i, matches_data,pipeline_pca=False,debug=False):
                             'ArgMax':df_scores[agg_cols].idxmax(axis= 0),
                             'Min':df_scores[agg_cols].min(axis= 0),
                             'ArgMin':df_scores[agg_cols].idxmin(axis= 0)}))
-
-    print("-"*100) #"-------------------------------------------------------------")
+    print("-"*100)
     print()
 
     return df_scores
@@ -312,6 +352,8 @@ def plot_analysis_1(data):
         pltcnt = pltcnt + 1
     plt.show()
 
+
+
 # Run through the sequence of analyses
 if __name__ == '__main__':
 
@@ -322,15 +364,15 @@ if __name__ == '__main__':
     df_all_runs = pd.DataFrame()
     all_runs = []
     all_entropies = []
-    do_plots = False
+    do_plots = True
     debug = True
-    compute_form = False
+    compute_form = True
 
     # loop over all data
     for i in range(len(all_seasons)):
         print(i)
-        output = matches_for_analysis(i+1,season_select='nth',
-                                      compute_form=compute_form)
+        output = matches_for_analysis(i+1,season_select='firstn',
+                                      compute_form=compute_form,window=7)
         df_scores = analysis_1(i, output, pipeline_pca=False,debug=True)
         # save the scores
         all_runs.append(df_scores.reset_index())
@@ -342,6 +384,11 @@ if __name__ == '__main__':
         print(dfa)
     if do_plots:
         lot_analysis_1(dfa)
+
+
+# get the confusion matrix and plot for the RBF
+
+
 
 assert(1==-1)
 
@@ -410,18 +457,7 @@ assert(1==-1)
 #print(cnf_matrix)
 #print()
 
-debug =False
-if debug:
-     np.set_printoptions(precision=2)
-     plt.figure()
-     h.plot_confusion_matrix(cnf_matrix, classes=output_class,
-                      title='Confusion matrix, without normalization')
 
-     plt.figure()
-     h.plot_confusion_matrix(cnf_matrix, classes=output_class, normalize=True,
-                      title='Normalized Confusion matrix')
-
-     plt.show()
 
 #### Problem seems to be the model is overpredicting one classifier.
 #### Could be a problem due to the unbalanced data set
