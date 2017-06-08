@@ -279,16 +279,18 @@ def merge_matches_with_form(matches, seasons=None, window=3):
         Generate the matches with form dataframe
     '''
     avg_cols =['match_id','home_team_win_average','home_team_draw_average',
-               'home_team_lose_average', 'away_team_win_average',
-               'away_team_draw_average','away_team_lose_average']
+               'away_team_win_average','away_team_draw_average']
+    #'home_team_lose_average', ,'away_team_lose_average'
 
     # get the matches with form
+    pickname = 'matches_with_form_{}.p'.format(window)
     try:
-        mwf = pd.read_pickle('matches_with_form.p')
+
+        mwf = pd.read_pickle(pickname)
     except Exception as e:
         mwf = get_all_seasons_data(None)
         mwf = compute_all_forms(mwf,window=window)
-        mwf.to_pickle('matches_with_form.p')
+        mwf.to_pickle(pickname)
 
     # filter the season ...
     if seasons:
@@ -296,9 +298,6 @@ def merge_matches_with_form(matches, seasons=None, window=3):
     # then only filter the specified columns
     mwf = mwf[avg_cols]
 
-    #print(mwf.columns.T)
-    #print()
-    #print(matches.columns.T)
     #idxs = matches[matches['match_id'].isin(matches_away['match_id'].values)].index
     matches = pd.merge(left=matches, right=mwf, how='left',
                         left_on='match_id', right_on='match_id')
@@ -392,8 +391,8 @@ def compute_all_forms(matches,window=3):
     matches['away_team_draw_average'] = 0.0
     matches['away_team_lose_average'] = 0.0
     avg_cols =['home_team_win_average','home_team_draw_average',
-               'home_team_lose_average', 'away_team_win_average',
-               'away_team_draw_average','away_team_lose_average']
+                'away_team_win_average', 'away_team_draw_average',
+              'home_team_lose_average', 'away_team_lose_average']
 
     matches['home_team_won'] = 1*(matches['home_team_goal'] > matches['away_team_goal'])
     matches['home_team_drew'] = 1*(matches['home_team_goal'] == matches['away_team_goal'])
@@ -405,9 +404,9 @@ def compute_all_forms(matches,window=3):
     in_cols = ['home_team_won','home_team_drew','home_team_lost',
                'away_team_won','away_team_drew','away_team_lost']
     all_cols = in_cols
-    all_cols.extend(['home_team_goal','away_team_goal','match_id'])
+    all_cols.extend(['home_team_goal','away_team_goal','match_id','match_date'])
     #this_team_win_average','this_team_lose_average','this_team_draw_average','
-    roll_cols = ['match_id','this_team_win_average','this_team_lose_average',
+    roll_cols = ['match_id','this_team_win_average', 'this_team_lose_average',
                  'this_team_draw_average']
 
     # get teams
@@ -421,11 +420,11 @@ def compute_all_forms(matches,window=3):
 
     for t in unique_teams:
         #print(t)
-        team_name = teams[teams['team_api_id']==t]['team_long_name']
+        team_name = teams[teams['team_api_id']== t]['team_long_name']
         print("Team_name {}".format(team_name.values[0]))
         # get the home teams for this team
-        dm = matches[(matches['home_team_api_id'] == t) |
-                    (matches['away_team_api_id'] == t)]
+        #dm = matches[(matches['home_team_api_id'] == t) |
+    #                (matches['away_team_api_id'] == t)]
         #print("dm size {}".format(dm.shape))
 
         matches_home = matches[matches['home_team_api_id'] == t].copy()
@@ -445,17 +444,27 @@ def compute_all_forms(matches,window=3):
 
         matches_t = matches_home.append(matches_away)
         matches_t.fillna(0, inplace=True)
+        #### sort
+        matches_t.sort_values(by=['match_date'],axis=0,inplace=True)
         #print("matches_t size {}".format(matches_t.shape))
 
         # compute the rolling statistics
-        matches_t.loc[:,'this_team_win_average'] = matches_t['this_team_won'].rolling(window,
-                                        win_type='triang').sum() / (1.0*window)
-        matches_t.loc[:,'this_team_draw_average'] = matches_t['this_team_drew'].rolling(window,
-                                        win_type='triang').sum() / (1.0*window)
-        matches_t.loc[:,'this_team_lose_average'] = matches_t['this_team_lost'].rolling(window,
-                                        win_type='triang').sum() / (1.0*window)
-        # fill in Nans for the first window -1 matches
+        matches_t.loc[:,'this_team_win_average'] = \
+                matches_t['this_team_won'].rolling(window).sum() / (1.0*window)
+        matches_t.loc[:,'this_team_draw_average'] = \
+                matches_t['this_team_drew'].rolling(window).sum() / (1.0*window)
+        matches_t.loc[:,'this_team_lose_average'] = \
+                matches_t['this_team_lost'].rolling(window).sum() / (1.0*window)
+        # fill in Nans for the first window - 1 matches
         matches_t.fillna(0, inplace=True)
+        #print(matches_t.head(8))
+        #print()
+        for rc in roll_cols:
+            if rc == 'match_id':
+                continue
+            matches_t[rc] = matches_t[rc].shift(1)
+        #print(matches_t.head(9))
+        #assert(1==-1)
         #print("matches_t size {}".format(matches_t.shape))
 
         # then reassign the computed average
@@ -491,21 +500,28 @@ def compute_all_forms(matches,window=3):
         #print("matches_away size {}".format(matches_away.shape))
         matches_home = matches_home[roll_cols]
         #print("matches_home size {}".format(matches_home.shape))
+        # shift the calculated averages since rolling includes the current row
+        # ... i mean we wouldn't want to cheat in predictions would we ;-)
+        # for rc in roll_cols:
+        #     if rc == 'match_id':
+        #         continue
+        #     matches_away[rc] = matches_away[rc].shift(1)
+        #     matches_home[rc] = matches_home[rc].shift(1)
+        matches_away.fillna(0, inplace=True)
+        matches_home.fillna(0, inplace=True)
+        #print(matches_away.tail())
+        #assert(-1==1)
 
         #print("matches size {}".format(matches.shape))
         matches = pd.merge(left=matches, right=matches_home, how='left',
                             left_on='match_id', right_on='match_id')
-        #print(matches.columns.T)
-        #assert(-1==1)
         idxs = matches[matches['match_id'].isin(matches_home['match_id'].values)].index
-        #print(idxs)
-        #print(len(idxs))
         matches.loc[idxs,'home_team_win_average'] = matches['this_team_win_average_y']
         matches.loc[idxs,'home_team_draw_average'] = matches['this_team_draw_average_y']
         matches.loc[idxs,'home_team_lose_average'] = matches['this_team_lose_average_y']
         #print("matches size {}".format(matches.shape))
         matches.drop(['this_team_win_average_y','this_team_draw_average_y',
-                            'this_team_lose_average_y'], axis=1,inplace=True)
+                      'this_team_lose_average_y'],axis=1,inplace=True)
         matches.rename(columns=to_rename, inplace=True)
         #print(matches.columns.T)
         #print("matches size {}".format(matches.shape))
@@ -519,7 +535,7 @@ def compute_all_forms(matches,window=3):
         #print("matches size {}".format(matches.shape))
         #print(matches.columns.T)
         matches.drop(['this_team_win_average_y','this_team_draw_average_y',
-                            'this_team_lose_average_y'], axis=1,inplace=True)
+                      'this_team_lose_average_y'], axis=1,inplace=True)
         matches.rename(columns=to_rename, inplace=True)
         #print("matches size {}".format(matches.shape))
         #print("")
@@ -539,6 +555,8 @@ def compute_all_forms(matches,window=3):
 
     #matches = matches.drop(in_cols, axis =1)
     #print(matches.columns.T)
+    matches.sort_values(by=['match_date'],axis=0,inplace=True)
+    matches.to_csv("matches_with_form_{}.csv".format(window), encoding='utf-8')
     return matches
 
 
