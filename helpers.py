@@ -12,6 +12,7 @@ import pickle
 import matplotlib
 matplotlib.use('TkAgg') #"Qt5Agg")
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import show, draw
 import sqlite3 as sql
 import numpy as np
 import pandas as pd
@@ -279,8 +280,8 @@ def merge_matches_with_form(matches, seasons=None, window=3):
         Generate the matches with form dataframe
     '''
     avg_cols =['match_id','home_team_win_average','home_team_draw_average',
-               'away_team_win_average','away_team_draw_average']
-    #'home_team_lose_average', ,'away_team_lose_average'
+               'away_team_win_average','away_team_draw_average',
+               'home_team_lose_average', 'away_team_lose_average']
 
     # get the matches with form
     pickname = 'matches_with_form_{}.p'.format(window)
@@ -554,7 +555,7 @@ def compute_all_forms(matches,window=3):
     #                    left_on = 'match_id', right_on='match_id')
 
     #matches = matches.drop(in_cols, axis =1)
-    #print(matches.columns.T)
+    print(matches.columns.T)
     matches.sort_values(by=['match_date'],axis=0,inplace=True)
     matches.to_csv("matches_with_form_{}.csv".format(window), encoding='utf-8')
     return matches

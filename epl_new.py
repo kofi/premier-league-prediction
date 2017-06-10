@@ -154,6 +154,34 @@ def get_nth_seasons(nseasons):
     #print(all_seasons[nseasons-1])
     return [all_seasons[nseasons-1]]
 
+def perform_eda_for_matches():
+        matches = h.preprocess_matches_for_season(None,
+                    compute_form=True)
+
+        matches = h.clean_up_matches(matches)
+        non_cat_list= matches.select_dtypes(exclude=['object']).columns.tolist()
+        matches = matches[non_cat_list]
+
+        matches.dropna(inplace=True)
+        matches.drop(['home_team_goal','away_team_goal'], axis =1, inplace=True)
+
+        home_columns = [x for x in matches.columns if 'home_' in x] # and 'average' in x ]
+        away_columns = [x for x in matches.columns if 'away_' in x]
+        # for c in matches.columns:
+        #     sbn.pairplot(data=matches,y_vars=[c],
+        #                  x_vars=[x for x in matches.columns if x != c])
+        # seaborn plots
+        # plot the home team data
+        sbn.pairplot(matches[home_columns])
+        print(matches[home_columns].columns.T)
+        print(matches[home_columns].describe())
+        sbn.plt.show()
+
+        print(matches[away_columns].columns.T)
+        print(matches[away_columns].describe())
+        sbn.plt.show()
+        #assert(-1==1)
+
 
 def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
                 compute_form= False, window=3):
@@ -222,9 +250,9 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
     win_stats = [percent_home_win, percent_home_loss, percent_home_draw]
     matches_entropy = -np.sum([k*math.log(k,2) for k in win_stats])
     print("Home team {:.3f} wins, {:.2f} losses, {:.2f} draws".format(
-    #        100*percent_home_win,100*percent_home_loss,100*percent_home_draw))
+            100*percent_home_win,100*percent_home_loss,100*percent_home_draw))
     print("Matches entropy: {:f}".format(matches_entropy))
-    print()
+    print("")
 
     # drop Nan rows
     allnas = matches.isnull().any()
@@ -373,6 +401,11 @@ def plot_analysis_1(data):
 # Run through the sequence of analyses
 if __name__ == '__main__':
 
+
+    # run EDA analysis
+    perform_eda_for_matches()
+    #assert(1==-1)
+
     #print(range(1,len(all_seasons)))
     print("about to start analysis")
     h.import_datasets()
@@ -410,7 +443,7 @@ if __name__ == '__main__':
 
 
 
-assert(1==-1)
+exit()
 
 
 # first split the data
