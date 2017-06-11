@@ -275,7 +275,8 @@ def merge_matches_attributes(matches, team_attributes):
 
     return matches
 
-def merge_matches_with_form(matches, seasons=None, window=3):
+def merge_matches_with_form(matches, seasons=None, window=3,
+                            exclude_firstn=True):
     '''
         Generate the matches with form dataframe
     '''
@@ -302,13 +303,53 @@ def merge_matches_with_form(matches, seasons=None, window=3):
     #idxs = matches[matches['match_id'].isin(matches_away['match_id'].values)].index
     matches = pd.merge(left=matches, right=mwf, how='left',
                         left_on='match_id', right_on='match_id')
-    #print()
-    #print(matches.columns.T)
-    #assert(-1==1)
 
+    matches.sort_values(by=['match_date'],axis=0,inplace=True)
+    cols = ['match_id', 'match_date','season','stage',
+                'home_team_api_id'] #,'away_team_api_id']
+
+    # if option is true then exclude the first N=window games for each team
+    if exclude_firstn:
+        # get the season's games
+        for s in matches['season'].unique():
+            #print("Shape before season {}, window {} drops: {}".format(s,
+            #                        window, matches.shape))
+            teams = matches['home_team_api_id'].unique()
+            # loop over each team
+            for t in teams:
+                # get the teams matches
+                match_slice= matches[(matches['home_team_api_id'] == t) |
+                                     (matches['away_team_api_id'] == t)]
+                match_slice = match_slice[match_slice['season']==s]
+
+                matches.drop(match_slice.index[:window],inplace=True,axis=0)
+            #print("Shape after season {}, window {} drops: {}".format(s,
+            #                        window, matches.shape))
+                #print(matches[matches['season']==s][cols].head(window*18))
+        #assert(-1==1)
     return matches
 
 
+def matches_home_away_diff(matches):
+    '''
+    Return dataset by taking a difference between home and away features
+    corresponding
+    '''
+    cols = matches.columns
+    home_cols = [x for x in matches.columns if 'home_' in x]
+    away_cols = [x for x in matches.columns if 'away_' in x]
+    #print(home_cols)
+    cols = [x.replace('home_','') for x in home_cols]
+    for c in cols:
+        matches[c] = matches['home_'+c] - matches['away_'+c]
+    #print("Shape of matches after new columns: {}".format(matches.shape))
+    matches.drop(home_cols, axis=1, inplace=True)
+    #print("Shape of matches after home drops: {}".format(matches.shape))
+    matches.drop(away_cols,axis=1, inplace=True)
+    #print("Shape of matches after away drops: {}".format(matches.shape))
+    #print(matches.columns.T)
+    #assert(1==-1)
+    return matches
 
 def clean_up_matches(matches):
     '''
@@ -422,7 +463,7 @@ def compute_all_forms(matches,window=3):
     for t in unique_teams:
         #print(t)
         team_name = teams[teams['team_api_id']== t]['team_long_name']
-        print("Team_name {}".format(team_name.values[0]))
+        print("Team: {}".format(team_name.values[0]))
         # get the home teams for this team
         #dm = matches[(matches['home_team_api_id'] == t) |
     #                (matches['away_team_api_id'] == t)]
@@ -555,7 +596,7 @@ def compute_all_forms(matches,window=3):
     #                    left_on = 'match_id', right_on='match_id')
 
     #matches = matches.drop(in_cols, axis =1)
-    print(matches.columns.T)
+    #print(matches.columns.T)
     matches.sort_values(by=['match_date'],axis=0,inplace=True)
     matches.to_csv("matches_with_form_{}.csv".format(window), encoding='utf-8')
     return matches

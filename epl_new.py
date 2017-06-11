@@ -66,7 +66,7 @@ predictors = []
 # number of K-folds to run
 nfolds = 5
 # number of times to run k-folds
-n_tests = 5
+n_tests = 1
 # the output classes for the matches
 output_class = np.array(['draw','lose','win'])
 
@@ -249,9 +249,9 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
     percent_home_draw = np.sum(matches['home_team_points'] == 1)/(1. * np.max(matches.shape[0]))
     win_stats = [percent_home_win, percent_home_loss, percent_home_draw]
     matches_entropy = -np.sum([k*math.log(k,2) for k in win_stats])
-    print("Home team {:.3f} wins, {:.2f} losses, {:.2f} draws".format(
-            100*percent_home_win,100*percent_home_loss,100*percent_home_draw))
-    print("Matches entropy: {:f}".format(matches_entropy))
+    #print("Home team {:.3f} wins, {:.2f} losses, {:.2f} draws".format(
+    #        100*percent_home_win,100*percent_home_loss,100*percent_home_draw))
+    #print("Matches entropy: {:f}".format(matches_entropy))
     print("")
 
     # drop Nan rows
@@ -272,7 +272,9 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
     matches_sub = matches.drop(['home_team_points','home_team_goal',
                         'away_team_goal','home_team_outcome'], axis=1)
     #print("Shape of matches after drop columns: {}".format(matches_sub.shape))
-
+    #print(matches_sub.columns.T)
+    print()
+    #matches_sub= h.matches_home_away_diff(matches_sub)
     # finally transform the data and scale to normalize
     try:
         X = np.array(StandardScaler().fit_transform(matches_sub))
@@ -352,7 +354,7 @@ def analysis_1(i, matches_data,pipeline_pca=False,debug=False):
         scores['seasons'] = i
         all_scores.append(scores)
         clf = k['clf'](**k['params'])
-        print(clf.__class__.__name__ + ' ' + k['params'].get('kernel',''))
+        #print(clf.__class__.__name__ + ' ' + k['params'].get('kernel',''))
         if clf.__class__.__name__ in ["SVC","DecisionTreeClassifier"]:
             y_pred = clf.fit(X,y).predict(X)
             #print_confmatrix(y,y_pred)
@@ -360,7 +362,7 @@ def analysis_1(i, matches_data,pipeline_pca=False,debug=False):
 
     df_scores = pd.DataFrame(all_scores)
     df_scores.set_index('clf', inplace=True)
-    print(df_scores)
+    #print(df_scores)
 
     # save the scores
     #all_runs.append(df_scores.reset_index())
@@ -403,7 +405,7 @@ if __name__ == '__main__':
 
 
     # run EDA analysis
-    perform_eda_for_matches()
+    #perform_eda_for_matches()
     #assert(1==-1)
 
     #print(range(1,len(all_seasons)))
@@ -421,7 +423,6 @@ if __name__ == '__main__':
         print("Window: {}".format(window))
         # loop over all data
         for i in range(1): #len(all_seasons)):
-            #print(i)
             output = matches_for_analysis(1,season_select='all',
                             compute_form=compute_form,window=window)
             df_scores = analysis_1(i, output, pipeline_pca=False,debug=True)
