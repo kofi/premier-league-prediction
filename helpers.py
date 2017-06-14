@@ -56,7 +56,8 @@ def import_datasets():
         all_team_attributes.to_pickle('all_team_attributes.p')
     #print('... completing the data import')
 
-def preprocess_matches_for_season(seasons, compute_form = False, window=3):
+def preprocess_matches_for_season(seasons, compute_form = False,
+                                  window=3, exclude_firstn=True):
     '''
     do all the preprocessing and return a matches dataframe ready
     for learning

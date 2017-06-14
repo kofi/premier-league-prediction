@@ -53,7 +53,8 @@ import warnings
 warnings.filterwarnings("ignore") #, category=DeprecationWarning)
 
 # Input data files are available in the "../input/" directory.
-# For example, running this (by clicking run or pressing Shift+Enter) will list the files in the input directory
+# For example, running this (by clicking run or pressing Shift+Enter)
+# will list the files in the input directory
 
 #from subprocess import check_output
 #print(check_output(["ls", "../input"]).decode("utf8"))
@@ -66,7 +67,7 @@ predictors = []
 # number of K-folds to run
 nfolds = 5
 # number of times to run k-folds
-n_tests = 1
+n_tests = 10
 # the output classes for the matches
 output_class = np.array(['draw','lose','win'])
 
@@ -79,7 +80,8 @@ def get_scores(clf, X, y):
     f1 = f1_score(y, clf.predict(X),average='weighted')
     ll = log_loss(y,clf.predict_proba(X))
     scores =  {'score': gen_score, 'f1_score': f1, 'log_loss': ll}
-    #print("{0} score:{score}, f1 score:{f1_score}, logloss:{log_loss}".format(type(clf).__name__,**scores))
+    #print("{0} score:{score}, f1 score:{f1_score},
+    #logloss:{log_loss}".format(type(clf).__name__,**scores))
     return scores
 
 
@@ -110,17 +112,23 @@ def run_kfolds(X,y,clf_class,**kwargs):
             # get the scores
             local_score = get_scores(clf, X_test, y_test)
             if scores is None:
+                # first time we run just set the value
                 scores = local_score
+                # create the confusion matrix
+                cnf_matrix = confusion_matrix(y_test, clf.predict(X_test))
             else:
+                # update the scores
                 for k,v in scores.items():
-                    #index = m*nfolds+k
                     scores[k] = scores[k] + local_score[k]
-                    #scores[k] = scores[k]+ local_score[k]
-        #cnf_matrix = confusion_matrix(y_test, clf.predict(X_test))
+                # update the confusion matrix
+                cnf_matrix = cnf_matrix + confusion_matrix(y_test,
+                                                        clf.predict(X_test))
+
     #print(scores)
     # compute the average scores across all folds
     scores = {k: v/(nfolds*n_tests*1.0) for k,v in scores.items()}
     #print(scores)
+    scores['cnf_matrix'] = cnf_matrix/(n_tests*1.0)
     scores['clf'] = clf.__class__.__name__
     if 'kernel' in kwargs:
         scores['clf'] = ("{}_{}".format(scores['clf'],kwargs['kernel']))
@@ -130,7 +138,8 @@ def get_random_seasons(nseasons):
     '''
         Get a list of n_seasons random seasons
     '''
-    seasons = [all_seasons[i] for i in random.sample(range(len(all_seasons)),nseasons)]
+    seasons = [all_seasons[i] for i in
+                        random.sample(range(len(all_seasons)),nseasons)]
     #print(seasons)
     #assert(-1==1)
     return seasons
@@ -184,7 +193,8 @@ def perform_eda_for_matches():
 
 
 def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
-                compute_form= False, window=3):
+                compute_form= False, window=3, exclude_firstn=True,
+                diff_features= True):
 
 
     season_selectors = {
@@ -201,7 +211,7 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
     # get_random_seasons(nseasons) #['2010/2011','2011/2012','2012/2013','2013/2014']
     #matches = h.preprocess_matches_for_season(season)
     matches = h.preprocess_matches_for_season(season,compute_form=compute_form,
-                            window=window)
+                            window=window,exclude_firstn=exclude_firstn)
     #print("Matches shape A {}".format(matches.shape))
     #print("Matches shape B {}".format(matches_with_form.shape))
     # filter out only the matches with the team of interest
@@ -229,6 +239,7 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
     #           'home_team_points'] #,'isteamhome']
     #matches[cols].tail()
     #print(matches.columns.T)
+
 
     # create the output columns
     matches['home_team_points'] = 3*(matches['home_team_goal'] > matches['away_team_goal']) + \
@@ -274,7 +285,9 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
     #print("Shape of matches after drop columns: {}".format(matches_sub.shape))
     #print(matches_sub.columns.T)
     print()
-    #matches_sub= h.matches_home_away_diff(matches_sub)
+    # only  use the diffed features for away & home teams when True
+    if diff_features:
+        matches_sub= h.matches_home_away_diff(matches_sub)
     # finally transform the data and scale to normalize
     try:
         X = np.array(StandardScaler().fit_transform(matches_sub))
@@ -292,32 +305,25 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
                 'y':y, 'entropy': matches_entropy}
 
 # print the confusion matrix
-def print_confmatrix(y, y_pred):
+def print_conf_matrix(y, y_pred, plot=False):
     cnf_matrix = confusion_matrix(y, y_pred) #, labels=output_class)
     print(cnf_matrix)
-    debug =False
-    if debug:
-         np.set_printoptions(precision=2)
-         plt.figure()
-         h.plot_confusion_matrix(cnf_matrix, classes=output_class,
-                          title='Confusion matrix, without normalization')
+    if plot:
+        plot_conf_matrix(cnf_matrix)
+# plot the confusion matrix
+def plot_conf_matrix(cnf_matrix):
+     np.set_printoptions(precision=2)
+     plt.figure()
+     h.plot_confusion_matrix(cnf_matrix, classes=output_class,
+                      title='Confusion matrix, without normalization')
 
-         plt.figure()
-         h.plot_confusion_matrix(cnf_matrix, classes=output_class,
-                    normalize=True, title='Normalized Confusion matrix')
-         plt.show()
-    # print(np.sum(np.sum(cnf_matrix)))
-    # #print("Verification of Confusion matrix")
-    # for i in output_class:
-    #     for j in output_class:
-    #         matrix_val = np.dot((y==i)*1.,(y_pred == j)*1)
-    #         print("{} but predicts {}:  {}".format(i,j,matrix_val))
-    #
-    # print()
-    # print(cnf_matrix)
+     plt.figure()
+     h.plot_confusion_matrix(cnf_matrix, classes=output_class,
+                normalize=True, title='Normalized Confusion matrix')
+     plt.show()
 
 # run the first analysis to just pick the best performing algorithms
-def analysis_1(i, matches_data,pipeline_pca=False,debug=False):
+def analysis_1(i, clfs, matches_data,pipeline_pca=False,debug=False):
     '''
         first analysis to identify best performing classifiers for further tuning
     '''
@@ -341,12 +347,7 @@ def analysis_1(i, matches_data,pipeline_pca=False,debug=False):
 
     # ... get the training score
     #clfs = [{'clf': SVC, 'params':{'kernel':'rbf', 'probability':True}}]
-    clfs = [{'clf': DummyClassifier, 'params':{'strategy':'most_frequent','random_state':0}},
-            {'clf': SVC, 'params':{'kernel':'linear', 'probability':True}},
-                {'clf': SVC, 'params':{'kernel':'rbf', 'probability':True}},
-                {'clf': DecisionTreeClassifier, 'params':{'random_state':0}},
-                {'clf': GNB, 'params':{}},
-                {'clf': SGDClassifier, 'params':{'loss':'log','alpha':0.001,'n_iter':100}}]
+
     all_scores = []
     for k in clfs:
         scores = run_kfolds(X,y,k['clf'], **k['params'])
@@ -354,16 +355,18 @@ def analysis_1(i, matches_data,pipeline_pca=False,debug=False):
         scores['seasons'] = i
         all_scores.append(scores)
         clf = k['clf'](**k['params'])
-        #print(clf.__class__.__name__ + ' ' + k['params'].get('kernel',''))
-        if clf.__class__.__name__ in ["SVC","DecisionTreeClassifier"]:
-            y_pred = clf.fit(X,y).predict(X)
-            #print_confmatrix(y,y_pred)
-            #print(classification_report(y, y_pred))
+        print(clf.__class__.__name__ + ' ' + k['params'].get('kernel',''))
+        #if clf.__class__.__name__ in ["SVC","DecisionTreeClassifier"]:
+        if debug:
+            cnf_matrix = scores['cnf_matrix']
+            print(cnf_matrix)
+            #plot_conf_matrix(cnf_matrix)
+            #print(classification_report(y, y_pred,digits=5))
 
     df_scores = pd.DataFrame(all_scores)
     df_scores.set_index('clf', inplace=True)
-    #print(df_scores)
-
+    #print(df_scores.drop('cnf_matrix',axis=1))
+    #assert(1==-1)
     # save the scores
     #all_runs.append(df_scores.reset_index())
     if debug:
@@ -409,22 +412,49 @@ if __name__ == '__main__':
     #assert(1==-1)
 
     #print(range(1,len(all_seasons)))
-    print("about to start analysis")
+    print("Import data: ")
     h.import_datasets()
     #setup a few data structures to store results
     all_runs = []
     all_entropies = []
     do_plots = False
-    debug = True
-    compute_form = True
+    debug = False
+    compute_form = False
+    clfs = [{'clf': DummyClassifier,
+             'params':{'strategy':'most_frequent', 'random_state':0}},
+        {'clf': SVC, 'params':{'kernel':'linear', 'probability':True}},
+        {'clf': SVC, 'params':{'kernel':'rbf', 'probability':True}},
+        {'clf': DecisionTreeClassifier, 'params':{'random_state':0}},
+        {'clf': GNB, 'params':{}},
+        {'clf': SGDClassifier,
+            'params':{'loss':'log','alpha':0.001,'n_iter':100}},
+        {'clf':kNN,'params':{'n_neighbors':12, 'weights':'distance'}}]
 
-    for window in range(11):
+    # Analysis 1:
+    # use all data and get the basic scores
+    #
+    options = {'season_select':'all','compute_form':compute_form,
+               'window':0,'exclude_firstn':False, 'diff_features':False}
+    output = matches_for_analysis(1,**options)
+    df_scores = analysis_1('all', clfs, output, pipeline_pca=False,debug=True)
+    all_runs.append(df_scores.reset_index())
+    dfa = pd.concat(all_runs,ignore_index= True)
+    print("Summary Results for all iterations:")
+    print(dfa.drop('cnf_matrix',axis=1))
+    print("Confusion Matrices")
+    print(dfa['cnf_matrix'])
+
+    assert(1==-1)
+
+
+    for window in range(13,14):
         all_runs = []
         print("Window: {}".format(window))
         # loop over all data
         for i in range(1): #len(all_seasons)):
             output = matches_for_analysis(1,season_select='all',
-                            compute_form=compute_form,window=window)
+                            compute_form=compute_form,window=window,
+                            exclude_firstn=True, diff_features= True)
             df_scores = analysis_1(i, output, pipeline_pca=False,debug=True)
             # save the scores
             all_runs.append(df_scores.reset_index())
@@ -433,7 +463,9 @@ if __name__ == '__main__':
         if debug:
             print()
             print("Summary Results for all iterations:")
-            print(dfa)
+            print(dfa.drop('cnf_matrix',axis=1))
+            print("Confusion Matrices")
+            print(dfa['cnf_matrix'])
         if do_plots:
             plot_analysis_1(dfa)
 
