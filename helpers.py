@@ -414,8 +414,59 @@ def get_all_seasons_data(seasons): #matches,tattr):
 
         newmatches = newmatches.append(m, ignore_index=False)
 
-    return newmatches
+    return  newmatches #compute_point_based_home_advantage(newmatches)
 
+
+def compute_point_based_home_advantage(matches):
+    unique_teams = matches['home_team_api_id'].unique()
+    # get teams
+    teams = get_all_teams()
+    seasons = matches['season'].unique()
+
+    matches['home_team_points'] = 3*(matches['home_team_goal'] > matches['away_team_goal']) + \
+                1*(matches['home_team_goal'] == matches['away_team_goal'])
+    matches['away_team_points'] = 3*(matches['home_team_goal'] < matches['away_team_goal']) + \
+                1*(matches['home_team_goal'] == matches['away_team_goal'])
+
+    matches['advantage_home'] = None
+    matches['home_points_cumsum'] = 0
+    matches['away_points_cumsum'] = 0
+    for team in unique_teams:
+
+        team_name = teams[teams['team_api_id']== team]['team_long_name']
+        #print("Team: {}".format(team_name.values[0]))
+        matches.sort_values(by=['match_date'],axis=0,inplace=True)
+
+        for season in seasons:
+            # home matches
+            cumsumh = matches.query('(season == @season) and (home_team_api_id == @team)')
+            matches.loc[cumsumh.index,'home_points_cumsum'] =  cumsumh['home_team_points'].cumsum()
+            # away matches
+            cumsuma = matches.query('(season == @season) and (away_team_api_id == @team)')
+            matches.loc[cumsuma.index,'away_points_cumsum'] =  cumsuma['away_team_points'].cumsum()
+            # matches['home_points_cumsum'] = \
+            #         matches.ix[(matches['season'] == season)]
+            #[matches['home_team_api_id'] == team]['home_team_points'].cumsum()
+
+            qry = '(season == @season) and ((home_team_api_id == @team) | (away_team_api_id == @team))'
+            cumsumb = matches.query(qry)
+            #print(cumsumb.index)
+            for i in range(1,len(cumsumb.index)):
+                # print(cumsumb.index[0:i])
+                hmax = matches.loc[cumsumb.index[0:i],'home_points_cumsum'].max()
+                amax = matches.loc[cumsumb.index[0:i],'away_points_cumsum'].max()
+                # print("i, amax, hmax:[{},{},{}]".format(i,amax, hmax))
+                # print(matches.loc[cumsumb.index[0:i],
+                #         ['home_points_cumsum','away_points_cumsum','home_advantage']].head(i+1))
+                #print()
+                if amax != 0:
+                    matches.loc[cumsumb.index[i],'advantage_home'] = hmax / (amax *1.)
+                else:
+                    matches.loc[cumsumb.index[i],'advantage_home'] = 0.0
+
+    matches.drop(['home_points_cumsum','away_points_cumsum', 'home_team_points',
+                  'away_team_points'], axis=1,inplace=True)
+    return matches
 
 def compute_all_forms(matches,window=3):
     #print(matches.info())
@@ -500,56 +551,24 @@ def compute_all_forms(matches,window=3):
                 matches_t['this_team_lost'].rolling(window).sum() / (1.0*window)
         # fill in Nans for the first window - 1 matches
         matches_t.fillna(0, inplace=True)
-        #print(matches_t.head(8))
-        #print()
         for rc in roll_cols:
             if rc == 'match_id':
                 continue
             matches_t[rc] = matches_t[rc].shift(1)
-        #print(matches_t.head(9))
-        #assert(1==-1)
         #print("matches_t size {}".format(matches_t.shape))
 
         # then reassign the computed average
         matches_t=matches_t[roll_cols]
         matches_home = pd.merge(left=matches_home, right=matches_t, how="left",
                             left_on = 'match_id', right_on='match_id')
-        # #print(matches_home.columns.T)
-        # matches_home['home_team_win_average'] = matches_home['this_team_win_average']
-        # matches_home['home_team_draw_average'] = matches_home['this_team_draw_average']
-        # matches_home['home_team_lose_average'] = matches_home['this_team_lose_average']
-        # matches_home.drop(['this_team_win_average','this_team_draw_average',
-        #                     'this_team_lose_average'], axis=1,inplace=True)
-        #print(matches_home.columns.T)
-        #print(matches_home)
-
         #print("matches_home size {}".format(matches_home.shape))
 
         matches_away = pd.merge(left=matches_away, right=matches_t, how="left",
                             left_on = 'match_id', right_on='match_id')
-        # matches_away['away_team_win_average'] = matches_away['this_team_win_average']
-        # matches_away['away_team_draw_average'] = matches_away['this_team_draw_average']
-        # matches_away['away_team_lose_average'] = matches_away['this_team_lose_average']
-        # matches_away.drop(['this_team_win_average','this_team_draw_average',
-        #                     'this_team_lose_average'], axis=1,inplace=True)
-        #print("matches_away size {}".format(matches_away.shape))
-        #print(matches_away.columns.T)
-        # matches_form = matches_form.append(matches_away, ignore_index=False)
-        # matches_form = matches_form.append(matches_home, ignore_index=False)
-        # print("matches_form size {}".format(matches_form.shape))
-        # print("")
 
         matches_away = matches_away[roll_cols]
         #print("matches_away size {}".format(matches_away.shape))
         matches_home = matches_home[roll_cols]
-        #print("matches_home size {}".format(matches_home.shape))
-        # shift the calculated averages since rolling includes the current row
-        # ... i mean we wouldn't want to cheat in predictions would we ;-)
-        # for rc in roll_cols:
-        #     if rc == 'match_id':
-        #         continue
-        #     matches_away[rc] = matches_away[rc].shift(1)
-        #     matches_home[rc] = matches_home[rc].shift(1)
         matches_away.fillna(0, inplace=True)
         matches_home.fillna(0, inplace=True)
         #print(matches_away.tail())
@@ -581,27 +600,53 @@ def compute_all_forms(matches,window=3):
                       'this_team_lose_average_y'], axis=1,inplace=True)
         matches.rename(columns=to_rename, inplace=True)
         #print("matches size {}".format(matches.shape))
-        #print("")
-        #assert(-1==1)
 
-
-    # then merge back into the matches
-    #allnas = matches.isnull().any()
-    #print(matches.info())
-    #print("Matches size {}".format(matches.shape))
-    #print("Forms size {}".format(matches_form.shape))
-    #matches.drop(in_cols, axis =1,inplace=True)
-    #print(matches[avg_cols].tail(12))
-    #assert(-1==1)
-    #matches = pd.merge(left=matches_t, right=matches_t, how="left",
-    #                    left_on = 'match_id', right_on='match_id')
-
-    #matches = matches.drop(in_cols, axis =1)
-    #print(matches.columns.T)
     matches.sort_values(by=['match_date'],axis=0,inplace=True)
     matches.to_csv("matches_with_form_{}.csv".format(window), encoding='utf-8')
     return matches
 
+
+def subsample_matches(matches):
+    '''
+     Attempt to sub sample matches dataset to generate equal distributions of
+     each class
+    '''
+    print('### Subsampling Data ####')
+    draws = matches[matches['home_team_outcome'] == 'draw']
+    wins = matches[matches['home_team_outcome'] == 'win']
+    losses = matches[matches['home_team_outcome'] == 'lose']
+    print("Losses:{}, draws:{}, wins:{}".format(len(losses), len(draws), len(wins)))
+
+    # subsample losses
+    are_draws_small = True if len(draws) < len(losses) else False
+
+    if are_draws_small:
+        percentage = len(draws)/float(len(losses))
+        losses_sampled =  losses.sample(frac = percentage, random_state = 2)
+        percentage = len(draws)/float(len(wins))
+        wins_sampled = wins.sample(frac = percentage, random_state = 2)
+        matches_sampled = draws.append(wins_sampled)
+        matches_sampled = matches_sampled.append(losses_sampled)
+
+        # print stats
+        print("Percentage losses	:", len(losses_sampled)/float(len(matches_sampled)))
+        print("Percentage draws		:", len(draws)/float(len(matches_sampled)))
+    else:
+        percentage = len(losses)/float(len(draws))
+        draws_sampled =  draws.sample(frac = percentage, random_state = 2)
+        percentage = len(losses)/float(len(wins))
+        wins_sampled = wins.sample(frac = percentage, random_state = 2)
+        matches_sampled = losses.append(wins_sampled)
+        matches_sampled = matches_sampled.append(draws_sampled)
+
+        #print stats
+        print("Percentage draws	:", len(draws_sampled)/float(len(matches_sampled)))
+        print("Percentage losses		:", len(losses)/float(len(matches_sampled)))
+
+    print("Percentage wins		:", len(wins_sampled)/float(len(matches_sampled)))
+    print("Total matches		:", len(matches_sampled))
+
+    return matches_sampled
 
 def plot_confusion_matrix(cm, classes,
                           normalize=False,
