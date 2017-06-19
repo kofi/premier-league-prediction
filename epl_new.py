@@ -11,6 +11,7 @@ import sys
 #from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QVBoxLayout, QSizePolicy, QMessageBox, QWidget, QPushButton
 #from PyQt5.QtGui import QIcon
 import itertools
+import pprint
 import math
 import numpy as np # linear algebra
 import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
@@ -61,7 +62,7 @@ warnings.filterwarnings("ignore") #, category=DeprecationWarning)
 
 # Any results you write to the current directory are saved as output.
 all_seasons=['2009/2010','2010/2011','2011/2012',
-    '2013/2014','2014/2015','2015/2016'] # '2012/2013', '2008/2009',
+            '2013/2014','2014/2015','2015/2016'] # '2012/2013', '2008/2009',
 predictors = []
 #clfs = ['SVR','LinearSVR']  #,'Lasso','RF','KNN']
 # number of K-folds to run
@@ -163,39 +164,127 @@ def get_nth_seasons(nseasons):
     #print(all_seasons[nseasons-1])
     return [all_seasons[nseasons-1]]
 
-def perform_eda_for_matches():
-        matches = h.preprocess_matches_for_season(None,
-                    compute_form=True)
+def perform_eda_for_matches_1():
+    matches = h.preprocess_matches_for_season(None,
+                compute_form=True)
 
-        matches = h.clean_up_matches(matches)
-        non_cat_list= matches.select_dtypes(exclude=['object']).columns.tolist()
-        matches = matches[non_cat_list]
+    matches = h.clean_up_matches(matches)
+    non_cat_list= matches.select_dtypes(exclude=['object']).columns.tolist()
+    matches = matches[non_cat_list]
 
-        matches.dropna(inplace=True)
-        matches.drop(['home_team_goal','away_team_goal'], axis =1, inplace=True)
+    matches.dropna(inplace=True)
+    matches.drop(['home_team_goal','away_team_goal'], axis =1, inplace=True)
 
-        home_columns = [x for x in matches.columns if 'home_' in x] # and 'average' in x ]
-        away_columns = [x for x in matches.columns if 'away_' in x]
-        # for c in matches.columns:
-        #     sbn.pairplot(data=matches,y_vars=[c],
-        #                  x_vars=[x for x in matches.columns if x != c])
-        # seaborn plots
-        # plot the home team data
-        sbn.pairplot(matches[home_columns])
-        print(matches[home_columns].columns.T)
-        print(matches[home_columns].describe())
-        sbn.plt.show()
+    home_columns = [x for x in matches.columns if 'home_' in x] # and 'average' in x ]
+    away_columns = [x for x in matches.columns if 'away_' in x]
+    # for c in matches.columns:
+    #     sbn.pairplot(data=matches,y_vars=[c],
+    #                  x_vars=[x for x in matches.columns if x != c])
+    # seaborn plots
+    # plot the home team data
+    sbn.pairplot(matches[home_columns])
+    print(matches[home_columns].columns.T)
+    print(matches[home_columns].describe())
+    sbn.plt.show()
 
-        print(matches[away_columns].columns.T)
-        print(matches[away_columns].describe())
-        sbn.plt.show()
-        #assert(-1==1)
+    print(matches[away_columns].columns.T)
+    print(matches[away_columns].describe())
+    sbn.plt.show()
+
+def perform_eda_for_matches_2():
+    
+    options = {'compute_form':False,
+        'window':0,'exclude_firstn':False,'home_advantage':'goals'}
+    matches = h.preprocess_matches_for_season(None,**options)
+    matches = h.clean_up_matches(matches)
+    # options = {'season_select':'all','compute_form':False,
+    #         'window':0,'exclude_firstn':False, 'diff_features':False,
+    #         'home_advantage':'goals'}
+    # output = matches_for_analysis(1,**options) 
+    # matches = output['rawdata']
+
+    matches['home_team_outcome'] = 'draw'
+    matches.loc[matches['home_team_goal'] > matches['away_team_goal'],
+                            ['home_team_outcome']] = 'win'
+    matches.loc[matches['home_team_goal'] < matches['away_team_goal'],
+                            ['home_team_outcome']] = 'lose'
+
+    matches.dropna(inplace=True)
+
+    cat_list= matches.select_dtypes(include=['object']).columns.tolist()
+    non_cat_list= matches.select_dtypes(exclude=['object']).columns.tolist()
+    print(non_cat_list)
+    categorized = cat_list + non_cat_list
+    n_plot_cols = 6
+    n_plot_rows = int(len(categorized)/(n_plot_cols+1) )
+    print((n_plot_cols,n_plot_rows))
+    f, axes = plt.subplots(n_plot_rows, n_plot_cols)#, sharex=True, sharey=True) #, figsize=(7, 7)) #)
+
+    for r in range(n_plot_rows):
+        for c in range(n_plot_cols):
+            col_index = n_plot_rows*r + c+ 1 
+
+            #if col_index >= len(cat_list): #matches.columns):
+            #    continue
+            col =  categorized[col_index]  #matches.columns[col_index] #cat_list[col_index] 
+            print('Columnn : {}'.format(col))
+            axes[r,c].set_title(col, fontsize= 7)
+            if col in cat_list:
+                # Set the various categories
+                values = matches[col].unique() 
+
+                # Create DataFrame containing categories and count of each
+                frame = pd.DataFrame(index = np.arange(len(values)), columns=(col,'Won','Lost','Drew'))
+                for i, value in enumerate(values):
+                    # print(i)
+                    # print(value)
+                    frame.loc[i] = [value, \
+                        len(matches[(matches['home_team_outcome'] == 'win') & (matches[col] == value)]), \
+                        len(matches[(matches['home_team_outcome'] == 'lose') & (matches[col] == value)]), \
+                        len(matches[(matches['home_team_outcome'] == 'draw') & (matches[col] == value)])]
+                
+                # Set the width of each bar
+                bar_width = 0.25 #1/(len(values)+1)
+
+                # Display each category's survival rates
+                for i in np.arange(len(frame)):
+
+                    win_bar = axes[r,c].bar(i, frame.loc[i]['Won'],width = bar_width,color = 'g')
+                    drew_bar = axes[r,c].bar(i-bar_width, frame.loc[i]['Drew'], width = bar_width, color = 'y')
+                    lost_bar = axes[r,c].bar(i-2*bar_width, frame.loc[i]['Lost'], width = bar_width, color = 'b')
+                    
+                    #axes[r,c].set_xticklabels(values, fontsize= 6)
+                    #plt.legend((win_bar[0], drew_bar[0], lost_bar),('Won', 'Drew','Lost'), framealpha = 0.8)
+            else:
+                
+                # Divide the range of data into bins and count survival rates
+                min_value = matches[col].min()
+                max_value = matches[col].max()
+                value_range = max_value - min_value
+
+                # 'Fares' has larger range of values than 'Age' so create more bins
+                bins = np.arange(0, matches[col].max() + 10, 10)
+
+                wins = matches[matches['home_team_outcome'] == 'win'][col].reset_index(drop = True)
+                losses = matches[matches['home_team_outcome'] == 'lose'][col].reset_index(drop = True)
+                draws = matches[matches['home_team_outcome'] == 'draw'][col].reset_index(drop = True)       
+                axes[r,c].hist(wins,bins = bins,alpha = 0.6,color = 'g',label = 'Won', normed=True)
+                axes[r,c].hist(draws, bins = bins, alpha = 0.6,color = 'y',label = 'Drew',normed=True)
+                axes[r,c].hist(losses, bins = bins, alpha = 0.6, color = 'b',label = 'Lost',normed=True)                
+
+    # for label in (axes.get_xticklabels() + ax.get_yticklabels()):
+    #     label.set_fontname('Arial')
+    #     label.set_fontsize(13)
+    #f
+    f.tight_layout()
+    f.show()
+    input()
+    print('exiting')
 
 
 def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
                 compute_form= False, window=3, exclude_firstn=True,
-                diff_features= True):
-
+                diff_features= False, home_advantage=None):
 
     season_selectors = {
         'random':get_random_seasons,
@@ -210,10 +299,11 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
     print("Seasons: {}".format(season))
     # get_random_seasons(nseasons) #['2010/2011','2011/2012','2012/2013','2013/2014']
     #matches = h.preprocess_matches_for_season(season)
-    matches = h.preprocess_matches_for_season(season,compute_form=compute_form,
-                            window=window,exclude_firstn=exclude_firstn)
-    #print("Matches shape A {}".format(matches.shape))
-    #print("Matches shape B {}".format(matches_with_form.shape))
+    options = {'compute_form':compute_form, 'window':window,
+                'exclude_firstn':exclude_firstn, 'home_advantage':home_advantage}
+    #print(options)
+    matches = h.preprocess_matches_for_season(season,**options)
+
     # filter out only the matches with the team of interest
     if filter_team:
         matches = matches[(matches['home_team_api_id'] == my_team_id)  |
@@ -229,17 +319,7 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
 
     matches = h.encode_matches(matches)
     #print("Matches shape C after encode {}".format(matches.shape))
-    #matches.describe()
-    #matches.info()
-    #print(matches)
     #print("Shape after cleanup and encode: {}".format(matches.shape))
-
-    #matches.head()
-    #cols = ['home_team_goal','away_team_goal', 'home_team_outcome',
-    #           'home_team_points'] #,'isteamhome']
-    #matches[cols].tail()
-    #print(matches.columns.T)
-
 
     # create the output columns
     matches['home_team_points'] = 3*(matches['home_team_goal'] > matches['away_team_goal']) + \
@@ -414,12 +494,14 @@ def plot_analysis_1(data):
 # Run through the sequence of analyses
 if __name__ == '__main__':
 
+    analysis = 2
     # run EDA analysis
-    #perform_eda_for_matches()
-    #assert(1==-1)
+    if analysis == 0:
+        perform_eda_for_matches_1()
+        perform_eda_for_matches_2()
 
-    #print(range(1,len(all_seasons)))
-    print("Import data: ")
+
+    print("Importing data ... ")
     h.import_datasets()
     #setup a few data structures to store results
     all_runs = []
@@ -440,49 +522,62 @@ if __name__ == '__main__':
     # Analysis 1:
     # use all data and get the basic scores
     #
-    # print("Analysis 1:")
-    # options = {'season_select':'all','compute_form':compute_form,
-    #            'window':0,'exclude_firstn':False, 'diff_features':False}
-    # output = matches_for_analysis(1,**options)
-    # df_scores = analysis_1('all', clfs, output, pipeline_pca=False,debug=True)
-    # all_runs.append(df_scores.reset_index())
-    # dfa = pd.concat(all_runs,ignore_index= True)
-    # print("Summary Results for all iterations:")
-    # print(dfa.drop('cnf_matrix',axis=1))
-    # print("Confusion Matrices")
-    # print(dfa['cnf_matrix'])
+    if analysis == 1:
+        print("Analysis 1:")
+        options = {'season_select':'all','compute_form':compute_form,
+                'window':0,'exclude_firstn':False, 'diff_features':False,
+                    'home_advantage':'goals'}
+        output = matches_for_analysis(1,**options)
+        df_scores = analysis_1('all', clfs, output, pipeline_pca=False,debug=True)
+        all_runs.append(df_scores.reset_index())
+        dfa = pd.concat(all_runs,ignore_index= True)
+        print("Summary Results for all iterations:")
+        print(dfa.drop('cnf_matrix',axis=1))
+        print("Confusion Matrices")
+        pprint.pprint(dfa['cnf_matrix'])
 
-    #assert(1==-1)
-
-    print("Analysis 2:")
-    all_runs = []
-    all_entropies = []
-    do_plots = False
-    debug = True
-    compute_form = True
-    for window in range(20):
+    
+    if analysis == 2:
+        print("Analysis 2:")
         all_runs = []
-        print("Window: {}".format(window))
-        # loop over all data
-        for i in range(1): #len(all_seasons)):
-            output = matches_for_analysis(1,season_select='all',
-                            compute_form=compute_form,window=window,
-                            exclude_firstn=True, diff_features= True)
-            df_scores = analysis_1(i, clfs, output, pipeline_pca=False,debug=debug)
-            # save the scores
-            all_runs.append(df_scores.reset_index())
+        all_entropies = []
+        do_plots = False
+        debug = True
+        compute_form = True
+        home_advantage = 'goals'
 
-        dfa = pd.concat(all_runs,ignore_index= True) #, keys=range(len(all_seasons)))
-        if debug:
-            print()
-            print("Summary Results for all iterations:")
-            print(dfa.drop('cnf_matrix',axis=1))
-            print("Confusion Matrices")
-            print(dfa['cnf_matrix'])
-        if do_plots:
-            plot_analysis_1(dfa)
+        options = {'season_select':'all', 'compute_form':compute_form,
+                 'exclude_firstn':True, 'diff_features': False, 
+                'home_advantage':home_advantage}
 
-        print("="*100)
+        window_range = 1 
+        if compute_form:
+            window_range = 20
+
+        print(window_range)
+        
+        for window in range(window_range):
+            all_runs = []
+            options['window'] = window
+            print("Window: {}".format(window))
+            # loop over all data
+            for i in range(1): #len(all_seasons)):
+                output = matches_for_analysis(1,**options)
+                df_scores = analysis_1(i, clfs, output, pipeline_pca=False,debug=debug)
+                # save the scores
+                all_runs.append(df_scores.reset_index())
+
+            dfa = pd.concat(all_runs,ignore_index= True) #, keys=range(len(all_seasons)))
+            if debug:
+                print()
+                print("Summary Results for all iterations:")
+                pprint.pprint(dfa.drop('cnf_matrix',axis=1))
+                print("Confusion Matrices")
+                pprint.pprint(dfa['cnf_matrix'])
+            if do_plots:
+                plot_analysis_1(dfa)
+
+            print("="*100)
 
 
 # get the confusion matrix and plot for the RBF

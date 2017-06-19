@@ -57,12 +57,18 @@ def import_datasets():
     #print('... completing the data import')
 
 def preprocess_matches_for_season(seasons, compute_form = False,
-                                  window=3, exclude_firstn=True):
+            window=3, exclude_firstn=True, home_advantage=None):
     '''
     do all the preprocessing and return a matches dataframe ready
     for learning
     '''
     matches = get_all_seasons_data(seasons) #matches, team_attributes)
+
+    if home_advantage:
+        if home_advantage == 'points':
+            matches = compute_point_based_home_advantage(matches)
+        if home_advantage == 'goals':
+            matches = compute_goal_based_home_advantage(matches)
 
     if compute_form:
         matches = merge_matches_with_form(matches=matches,
@@ -386,9 +392,7 @@ def get_all_seasons_data(seasons): #matches,tattr):
     get the number of unique seasons in the matches dataframe
     '''
     matches = get_matches_for_seasons(seasons)
-    #print("matches shape 1 {}".format(matches.shape) )
     matches = matches[matches.columns[:11]]
-    #print("matches shape 2 {}".format(matches.shape))
     # get attributes
     tattr = get_attributes_for_seasons(seasons)
 
@@ -414,7 +418,7 @@ def get_all_seasons_data(seasons): #matches,tattr):
 
         newmatches = newmatches.append(m, ignore_index=False)
 
-    return  newmatches #compute_point_based_home_advantage(newmatches)
+    return  newmatches #
 
 
 def compute_point_based_home_advantage(matches):
@@ -466,6 +470,54 @@ def compute_point_based_home_advantage(matches):
 
     matches.drop(['home_points_cumsum','away_points_cumsum', 'home_team_points',
                   'away_team_points'], axis=1,inplace=True)
+    
+    matches['advantage_home'] = pd.to_numeric(matches['advantage_home'],errors='coerce')
+    return matches
+
+def compute_goal_based_home_advantage(matches):
+    unique_teams = matches['home_team_api_id'].unique()
+    # get teams
+    teams = get_all_teams()
+    seasons = matches['season'].unique()
+
+    matches['advantage_home'] = None
+    matches['home_goals_cumsum'] = 0
+    matches['away_goals_cumsum'] = 0
+    for team in unique_teams:
+
+        team_name = teams[teams['team_api_id']== team]['team_long_name']
+        #print("Team: {}".format(team_name.values[0]))
+        matches.sort_values(by=['match_date'],axis=0,inplace=True)
+
+        for season in seasons:
+            # home matches
+            cumsumh = matches.query('(season == @season) and (home_team_api_id == @team)')
+            matches.loc[cumsumh.index,'home_goals_cumsum'] =  cumsumh['home_team_goal'].cumsum()
+            # away matches
+            cumsuma = matches.query('(season == @season) and (away_team_api_id == @team)')
+            matches.loc[cumsuma.index,'away_goals_cumsum'] =  cumsuma['away_team_goal'].cumsum()
+
+            qry = '(season == @season) and ((home_team_api_id == @team) | (away_team_api_id == @team))'
+            cumsumb = matches.query(qry)
+
+            for i in range(1,len(cumsumb.index)):
+                # print(cumsumb.index[0:i])
+                home_mean = matches.loc[cumsumb.index[0:i],'home_goals_cumsum'].max()
+                away_mean = matches.loc[cumsumb.index[0:i],'away_goals_cumsum'].max()
+
+                # get count of home game so far ...
+                num_home_games = cumsumb.query('home_team_api_id == @team').shape[0]
+                num_away_games = cumsumb.query('away_team_api_id == @team').shape[0]
+                
+                if (num_home_games != 0) &  (num_away_games != 0):
+                    home_mean = home_mean / (1. * num_home_games)
+                    away_mean = away_mean / (1. * num_away_games)
+                    matches.loc[cumsumb.index[i],'advantage_home'] = home_mean - away_mean 
+
+    matches.drop(['home_goals_cumsum','away_goals_cumsum'], axis=1,inplace=True)
+
+    matches['advantage_home'] = pd.to_numeric(matches['advantage_home'],errors='coerce')
+
     return matches
 
 def compute_all_forms(matches,window=3):
@@ -515,7 +567,7 @@ def compute_all_forms(matches,window=3):
     for t in unique_teams:
         #print(t)
         team_name = teams[teams['team_api_id']== t]['team_long_name']
-        print("Team: {}".format(team_name.values[0]))
+        #print("Team: {}".format(team_name.values[0]))
         # get the home teams for this team
         #dm = matches[(matches['home_team_api_id'] == t) |
     #                (matches['away_team_api_id'] == t)]
