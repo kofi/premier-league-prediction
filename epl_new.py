@@ -33,6 +33,9 @@ from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 
 from sklearn.model_selection import KFold #cross_validation import KFold
+from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import log_loss
 
@@ -43,12 +46,15 @@ from sklearn.linear_model import LogisticRegression as LR
 from sklearn.neighbors import KNeighborsClassifier as kNN
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import SGDClassifier
+from sklearn.ensemble import RandomForestClassifier
 
 from sklearn.metrics.pairwise import chi2_kernel
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
+
+
 
 import warnings
 warnings.filterwarnings("ignore") #, category=DeprecationWarning)
@@ -92,7 +98,8 @@ def run_kfolds(X,y,clf_class,**kwargs):
         Also computes relevant scores and returns them
     '''
     # Construct a kfolds object
-    kf = KFold(n_splits=nfolds,shuffle=True)
+    kf = StratifiedKFold(n_splits=nfolds,shuffle=True,random_state=50)
+    #KFold(n_splits=nfolds,shuffle=True)
     y_pred = y.copy()
     scores = None
     cnf_matrix = None
@@ -101,7 +108,7 @@ def run_kfolds(X,y,clf_class,**kwargs):
     # iterate through number of tests to run
     for m in range(n_tests):
         # Iterate through folds
-        for train_index, test_index in kf.split(X):
+        for train_index, test_index in kf.split(X,y):
             # get the training and test sets
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
@@ -443,7 +450,7 @@ def analysis_1(i, clfs, matches_data,pipeline_pca=False,debug=False):
         scores['seasons'] = i
         all_scores.append(scores)
         clf = k['clf'](**k['params'])
-        print(clf.__class__.__name__ + ' ' + k['params'].get('kernel',''))
+        #print(clf.__class__.__name__ + ' ' + k['params'].get('kernel',''))
         #if clf.__class__.__name__ in ["SVC","DecisionTreeClassifier"]:
         if debug:
             cnf_matrix = scores['cnf_matrix']
@@ -454,7 +461,6 @@ def analysis_1(i, clfs, matches_data,pipeline_pca=False,debug=False):
     df_scores = pd.DataFrame(all_scores)
     df_scores.set_index('clf', inplace=True)
     #print(df_scores.drop('cnf_matrix',axis=1))
-    #assert(1==-1)
     # save the scores
     #all_runs.append(df_scores.reset_index())
     if debug:
@@ -479,7 +485,7 @@ def plot_analysis_1(data):
     pltcnt = 0
     for s in scores:
         for c in classifiers:
-            myd = data.loc[dfa['clf'].str.contains(c)]
+            myd = data.loc[data['clf'].str.contains(c)] #dfa
             ax[pltcnt].plot(myd['seasons'], myd[s],'-',label=c)
         ax[pltcnt].axis('tight')
         ax[pltcnt].set_xlim(0,len(myd['seasons'])-1)
@@ -515,6 +521,7 @@ if __name__ == '__main__':
         {'clf': SVC, 'params':{'kernel':'rbf', 'probability':True}},
         {'clf': DecisionTreeClassifier, 'params':{'random_state':0}},
         {'clf': GNB, 'params':{}},
+        {'clf': RandomForestClassifier, 'params':{}},
         {'clf': SGDClassifier,
             'params':{'loss':'log','alpha':0.001,'n_iter':100}},
         {'clf':kNN,'params':{'n_neighbors':12, 'weights':'distance'}}]
@@ -547,8 +554,8 @@ if __name__ == '__main__':
         home_advantage = 'goals'
 
         options = {'season_select':'all', 'compute_form':compute_form,
-                 'exclude_firstn':True, 'diff_features': False, 
-                'home_advantage':home_advantage}
+                    'exclude_firstn':True, 'diff_features': True, 
+                    'home_advantage':home_advantage}
 
         window_range = 1 
         if compute_form:
@@ -572,12 +579,82 @@ if __name__ == '__main__':
                 print()
                 print("Summary Results for all iterations:")
                 pprint.pprint(dfa.drop('cnf_matrix',axis=1))
-                print("Confusion Matrices")
-                pprint.pprint(dfa['cnf_matrix'])
+                #print("Confusion Matrices")
+                #pprint.pprint(dfa['cnf_matrix'])
             if do_plots:
                 plot_analysis_1(dfa)
 
             print("="*100)
+
+    if analysis == 3:
+        
+        do_plots = False
+        debug = True
+        compute_form = True
+        home_advantage = 'goals'
+        window = 14
+        options = {'season_select':'all', 'compute_form':compute_form,
+                 'exclude_firstn':True, 'diff_features': False, 
+                'home_advantage':home_advantage,'window':window}
+        
+        output = matches_for_analysis(1,**options)
+        X, y = output['X'], output['y']
+
+        # iterate over SVC grid
+        C_range = np.linspace(0.001,0.03,15) # 3, 12)
+        gamma_range = np.linspace(1,7,15) #12)
+        param_grid = dict(gamma=gamma_range, C=C_range)
+        cv = StratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=42)
+        svc_params = {'kernel':'rbf', 'probability':True}
+        grid = GridSearchCV(SVC(**svc_params), param_grid=param_grid, cv=cv)
+        grid.fit(X, y)
+
+        print("The best parameters are %s with a score of %0.6f"
+            % (grid.best_params_, grid.best_score_))
+        
+        #input() 
+
+        all_scores = []
+        for C in C_range:
+            for gamma in gamma_range:
+                print("C: {}, gamma: {}".format(C, gamma))
+                svc_params = {'kernel':'rbf', 
+                            'probability':True,
+                            'C':C,'gamma':gamma}
+                clf = SVC
+                scores = run_kfolds(X,y,clf,**svc_params)
+                scores['C'] = C
+                scores['gamma'] = gamma
+                all_scores.append(scores)
+        
+        df_scores = pd.DataFrame(all_scores)  #pd.DataFrame(all_scores)
+        df_scores.reset_index()
+        print(df_scores.columns)
+        #df_scores.set_index('clf', inplace=True)
+        df_scores_nocnf = df_scores.drop('cnf_matrix',axis=1)
+        print(df_scores_nocnf)
+        df_scores_nocnf.to_csv("param_tuning_{}.csv".format(window), encoding='utf-8')
+        to_plot = ['C','gamma','score']
+        plt.xticks(rotation=45)
+        plt.yticks(rotation=0)
+        plt.title("F1 Score")
+        ax = sbn.heatmap(df_scores.pivot('C','gamma','f1_score'))
+        #g.set_xticklabels(rotation=30)
+
+        plt.show()
+
+
+        input()
+        plt.xticks(rotation=45)
+        plt.yticks(rotation=0)
+        plt.title("Score")
+        ax = sbn.heatmap(df_scores.pivot('C','gamma','score'))
+        #g.set_xticklabels(rotation=30)
+        plt.show()
+
+
+
+        input()
 
 
 # get the confusion matrix and plot for the RBF
