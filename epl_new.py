@@ -69,6 +69,9 @@ warnings.filterwarnings("ignore") #, category=DeprecationWarning)
 # Any results you write to the current directory are saved as output.
 all_seasons=['2009/2010','2010/2011','2011/2012',
             '2013/2014','2014/2015','2015/2016'] # '2012/2013', '2008/2009',
+training_seasons = ['2009/2010','2010/2011','2011/2012',
+            '2013/2014','2014/2015'] 
+test_seasons = ['2015/2016']
 predictors = []
 #clfs = ['SVR','LinearSVR']  #,'Lasso','RF','KNN']
 # number of K-folds to run
@@ -156,20 +159,22 @@ def get_firstn_seasons(nseasons):
         Get a list of the first nseasons
     '''
     #print(all_seasons[0:nseasons])
-    return all_seasons[0:nseasons]
+    if nseasons >= len(all_seasons):
+        return all_seasons[:]
+    return all_seasons[0:nseasons] if not istrain else training_seasons[0:nseasons]
 
-def get_all_seasons(nseasons):
+def get_all_seasons(nseasons,istrain=True):
     '''
         Get a list of the first nseasons
     '''
-    return all_seasons
+    return all_seasons if not istrain else training_seasons
 
-def get_nth_seasons(nseasons):
+def get_nth_seasons(nseasons,istrain=False):
     '''
         Get a list of the nseasons_th season
     '''
     #print(all_seasons[nseasons-1])
-    return [all_seasons[nseasons-1]]
+    return [all_seasons[nseasons-1] if not istrain else training_seasons[nseasons-1]]
 
 def perform_eda_for_matches_1():
     matches = h.preprocess_matches_for_season(None,
@@ -500,7 +505,7 @@ def plot_analysis_1(data):
 # Run through the sequence of analyses
 if __name__ == '__main__':
 
-    analysis = 2
+    analysis = 3
     # run EDA analysis
     if analysis == 0:
         perform_eda_for_matches_1()
@@ -601,18 +606,18 @@ if __name__ == '__main__':
         X, y = output['X'], output['y']
 
         # iterate over SVC grid
-        C_range = np.linspace(0.001,0.03,15) # 3, 12)
-        gamma_range = np.linspace(1,7,15) #12)
+        C_range = np.logspace(0.0001,5,15) #np.linspace(0.001,0.03,15) # 3, 12)
+        gamma_range = np.linspace(0.0001,2,15) #np.linspace(1,7,15) #12)
         param_grid = dict(gamma=gamma_range, C=C_range)
         cv = StratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=42)
         svc_params = {'kernel':'rbf', 'probability':True}
-        grid = GridSearchCV(SVC(**svc_params), param_grid=param_grid, cv=cv)
+        grid = GridSearchCV(SVC(**svc_params), param_grid=param_grid, cv=cv,scoring='f1_weighted')
         grid.fit(X, y)
 
         print("The best parameters are %s with a score of %0.6f"
             % (grid.best_params_, grid.best_score_))
         
-        #input() 
+        input() 
 
         all_scores = []
         for C in C_range:
