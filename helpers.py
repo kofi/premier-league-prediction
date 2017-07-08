@@ -358,7 +358,7 @@ def matches_home_away_diff(matches):
     #assert(1==-1)
     return matches
 
-def clean_up_matches(matches):
+def clean_up_matches(matches, ignore_columns=None):
     '''
     clean up matches dataframe by removing nulls
     also drop some additioonal columns: either ids or
@@ -368,6 +368,8 @@ def clean_up_matches(matches):
     to_drop = [ 'match_id','stage', 'match_date','home_team_api_id',
             'away_team_api_id','home_team', 'away_team','season',
             'home_buildUpPlayDribbling','away_buildUpPlayDribbling']
+    if ignore_columns is not None:
+        to_drop = [x for x in to_drop if x not in ignore_columns]
     #'home_team_goal', 'away_team_goal',
     # make a copy of the matches dataframe and drop the appropriate fields while deleting the unneeded features
     matches = matches.drop(to_drop, axis =1)
@@ -375,15 +377,17 @@ def clean_up_matches(matches):
 
     return matches
 
-def encode_matches(matches):
+def encode_matches(matches, ignore_columns=None):
     '''
     encode category columns using the dummies to create a column per option
     '''
     # get categorical data ...
     cat_list= matches.select_dtypes(include=['object']).columns.tolist()
+    if ignore_columns is not None:
+        cat_list = [x for x in cat_list if x not in ignore_columns]
     #print("cat list: {}".format(cat_list))
     # then encode those columns ...
-    matches = pd.get_dummies(matches, prefix=cat_list)
+    matches = pd.get_dummies(matches, prefix=cat_list, columns=cat_list)
     #print("Matches shape after encode up {}".format(matches.shape))
     return matches
 
