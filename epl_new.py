@@ -42,6 +42,7 @@ from sklearn.metrics import log_loss
 
 from sklearn.dummy import DummyClassifier
 from sklearn.svm import SVC
+from sklearn.svm import LinearSVC
 from sklearn.naive_bayes import GaussianNB as GNB
 from sklearn.linear_model import LogisticRegression as LR
 from sklearn.neighbors import KNeighborsClassifier as kNN
@@ -49,6 +50,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import SGDClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.multiclass import OneVsRestClassifier
+from sklearn.calibration import CalibratedClassifierCV
 
 from sklearn.metrics.pairwise import chi2_kernel
 from sklearn.metrics import accuracy_score
@@ -416,7 +418,9 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
             test_matches_sub = h.matches_home_away_diff(test_matches_sub)
     # finally transform the data and scale to normalize
     try:
-        ss = StandardScaler().fit(matches_sub)
+        # for SVC we need to scale both the test and training sets at the same time
+        # http://scikit-learn.org/stable/modules/svm.html#tips-on-practical-use
+        ss = StandardScaler().fit(matches_sub.append(test_matches_sub))
         X =np.array(ss.transform(matches_sub)) # np.array(StandardScaler().fit_transform(matches_sub))
         if train_test_split:
             ss = StandardScaler().fit(test_matches_sub)
@@ -556,19 +560,23 @@ if __name__ == '__main__':
     debug = False
     compute_form = False
     sgdc_clf = SGDClassifier(loss='log',alpha=0.001,n_iter=100)
+    # for Linear SVC see http://scikit-learn.org/stable/modules/calibration.html
+    #https://stackoverflow.com/questions/26478000/converting-linearsvcs-decision-function-to-probabilities-scikit-learn-python
+    lscv = LinearSCV(class_weight:'balanced')
     clfs = [{'clf': DummyClassifier,
                 'params':{'strategy':'most_frequent', 'random_state':0}},
-            {'clf': SVC, 'params':{'kernel':'linear', 'probability':True}},
-            {'clf': SVC, 'params':{'kernel':'rbf', 'probability':True}},
-            {'clf': DecisionTreeClassifier, 'params':{'random_state':0}},
-            {'clf': GNB, 'params':{}},
-            {'clf': RandomForestClassifier, 'params':{}},
-            {'clf': SGDClassifier,
-                'params':{'loss':'log','alpha':0.001,'n_iter':100}},
-            {'clf':kNN,'params':{'n_neighbors':5, 'weights':'distance'}},
-            {'clf':OneVsRestClassifier, 
-                'params':{'estimator': sgdc_clf}}]
-            #'params':{'loss':'log','alpha':0.001,'n_iter':100}}}]
+        {'clf': SVC, 'params':{'kernel':'linear', 'class_weight':'balanced', 'probability':True}},
+        {'clf': SVC, 'params':{'kernel':'rbf', 'class_weight':'balanced', 'probability':True}},
+        {'clf': CalibratedClassifierCV, 'params':{'estimator':lscv}},
+        {'clf': DecisionTreeClassifier, 'params':{'random_state':0}},
+        {'clf': GNB, 'params':{}},
+        {'clf': RandomForestClassifier, 'params':{}},
+        {'clf': SGDClassifier,
+            'params':{'loss':'log','alpha':0.001,'n_iter':100}},
+        {'clf':kNN,'params':{'n_neighbors':5, 'weights':'distance'}},
+        {'clf':OneVsRestClassifier, 
+            'params':{'estimator': sgdc_clf}}]
+        #'params':{'loss':'log','alpha':0.001,'n_iter':100}}}]
 
     # Analysis 1:
     # use all data and get the basic scores
@@ -595,7 +603,7 @@ if __name__ == '__main__':
         do_plots = False
         debug = True
         compute_form = True
-        home_advantage = 'goals'
+        home_advantage = 'both' #'goals','points'
         diff_features = False
 
         options = {'season_select':'all','compute_form':compute_form,
@@ -684,8 +692,8 @@ if __name__ == '__main__':
         X, y = output['X'], output['y']
 
         # iterate over SVC grid
-        C_range = np.logspace(0.0001,5,100) #np.linspace(0.001,0.03,15) # 3, 12)
-        gamma_range = np.linspace(0.00001,2,100) #np.linspace(1,7,15) #12)
+        C_range =  [0.01, 0.25, 0.5, .75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3] #np.logspace(0.0001,5,100) #np.linspace(0.001,0.03,15) # 3, 12)
+        gamma_range =[0, 1e-5, 1e-4,1e-3, .01, .1, .15, .2, .25, .5, .75, 1] #np.linspace(0.00001,2,100) #np.linspace(1,7,15) #12)
         param_grid = dict(gamma=gamma_range, C=C_range)
         cv = StratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=42)
         svc_params = {'kernel':'rbf', 'probability':True}
