@@ -562,7 +562,7 @@ if __name__ == '__main__':
     sgdc_clf = SGDClassifier(loss='log',alpha=0.001,n_iter=100)
     # for Linear SVC see http://scikit-learn.org/stable/modules/calibration.html
     #https://stackoverflow.com/questions/26478000/converting-linearsvcs-decision-function-to-probabilities-scikit-learn-python
-    lscv = LinearSCV(class_weight:'balanced')
+    lscv = LinearSCV(class_weight='balanced')
     clfs = [{'clf': DummyClassifier,
                 'params':{'strategy':'most_frequent', 'random_state':0}},
         {'clf': SVC, 'params':{'kernel':'linear', 'class_weight':'balanced', 'probability':True}},
@@ -696,7 +696,7 @@ if __name__ == '__main__':
         gamma_range =[0, 1e-5, 1e-4,1e-3, .01, .1, .15, .2, .25, .5, .75, 1] #np.linspace(0.00001,2,100) #np.linspace(1,7,15) #12)
         param_grid = dict(gamma=gamma_range, C=C_range)
         cv = StratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=42)
-        svc_params = {'kernel':'rbf', 'probability':True}
+        svc_params = {'kernel':'rbf', 'class_weight':'balanced', 'probability':True}
         grid = GridSearchCV(SVC(**svc_params), param_grid=param_grid, cv=cv,scoring='f1_weighted')
         grid.fit(X, y)
 
@@ -717,9 +717,8 @@ if __name__ == '__main__':
         for C in C_range:
             for gamma in gamma_range:
                 #print("C: {}, gamma: {}".format(C, gamma))
-                svc_params = {'kernel':'rbf', 
-                            'probability':True,
-                            'C':C,'gamma':gamma}
+                svc_params = {'kernel':'rbf', 'probability':True,
+                            'class_weight':'balanced','C':C,'gamma':gamma}
                 clf = SVC
                 scores = run_kfolds(X,y,clf,**svc_params)
                 scores['C'] = C
@@ -769,7 +768,7 @@ if __name__ == '__main__':
 
         C =   569.04542855790191 #4862.8956398672553 # 569.04542855790191 #6221.488221346056 #1638.0284049793586
         gamma = 0.0001 #0.00001 #0.0001# 6.3636363636363641e-05 #0.0001
-        svc_params = {'kernel':'rbf', 'probability':True,'C':C,'gamma':gamma}
+        svc_params = {'kernel':'rbf', 'class_weight':'balanced', 'probability':True,'C':C,'gamma':gamma}
         pprint.pprint("SVC params {}".format(svc_params))
         compute_form = True
         home_advantage = 'goals'
