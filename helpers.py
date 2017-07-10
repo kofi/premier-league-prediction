@@ -12,10 +12,12 @@ import pickle
 import matplotlib
 matplotlib.use('TkAgg') #"Qt5Agg")
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from matplotlib.pyplot import show, draw
 import sqlite3 as sql
 import numpy as np
 import pandas as pd
+import pprint 
 #import re
 
 
@@ -709,6 +711,40 @@ def subsample_matches(matches):
 
     return matches_sampled
 
+
+def pca_results(data, pca, columns):
+    '''
+    Create a DataFrame of the PCA results
+    Includes dimension feature weights and explained variance
+    Visualizes the PCA results
+    '''
+    # Dimension indexing
+    dimensions =  ['Dimension {}'.format(i) for i in range(1,len(pca.components_)+1)]
+    # PCA components
+    components = pd.DataFrame(np.round(pca.components_, 4), columns = columns) # data.keys())
+    components.index = dimensions
+    # PCA explained variance
+    ratios = pca.explained_variance_ratio_.reshape(len(pca.components_), 1)
+    variance_ratios = pd.DataFrame(np.round(ratios, 4), columns = ['Explained Variance'])
+    variance_ratios.index = dimensions
+    # Create a bar plot visualization
+    fig, ax = plt.subplots(figsize = (14,8))
+    # Plot the feature weights as a function of the components
+    components.plot(ax = ax, kind = 'bar');
+    #print("Components:")
+    #pprint.pprint(components.T)
+    ax.set_ylabel("Feature Weights")
+    ax.set_xticklabels(dimensions, rotation=0)
+    # Display the explained variance ratios
+    for i, ev in enumerate(pca.explained_variance_ratio_):
+        ax.text(i-0.40, ax.get_ylim()[1] + 0.05, "Explained Variance\n%.4f"%(ev))
+        #pprint.pprint("{} {}".format(i,ev))
+        
+    
+    plt.show()
+    # Return a concatenated DataFrame
+    return pd.concat([variance_ratios, components], axis = 1)
+
 def plot_confusion_matrix(cm, classes,
                           normalize=False,
                           title='Confusion matrix',
@@ -750,3 +786,4 @@ def plot_confusion_matrix(cm, classes,
     # ax = sns.heatmap(cm)
     # ax.ylabel('True label')
     # ax.xlabel('Predicted label')
+
