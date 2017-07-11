@@ -336,7 +336,7 @@ def perform_eda_for_matches_2():
 def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
                 compute_form= False, window=3, exclude_firstn=True,
                 diff_features= False, home_advantage=None,istrain=False,
-                train_test_split=False):
+                train_test_split=False,league_name="England"):
 
     season_selectors = {
         'random':get_random_seasons,
@@ -352,9 +352,9 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
     print("Seasons: {}".format(season))
     # get_random_seasons(nseasons) #['2010/2011','2011/2012','2012/2013','2013/2014']
     #matches = h.preprocess_matches_for_season(season)
-    options = {'compute_form':compute_form, 'window':window,
-                'exclude_firstn':exclude_firstn, 'home_advantage':home_advantage}
-    #print(options)
+    options = {'compute_form':compute_form, 'window':window,'exclude_firstn':exclude_firstn,
+                'home_advantage':home_advantage,'league_name':league_name}
+
     matches = h.preprocess_matches_for_season(season,**options)
 
     # filter out only the matches with the team of interest
@@ -662,6 +662,7 @@ def plot_roc_curves(X,y,clf,train_rows,kwargs=None):
 if __name__ == '__main__':
 
     analysis = 2
+    league_name = "Germany"
 
     # run EDA analysis
     if analysis == 0:
@@ -706,7 +707,7 @@ if __name__ == '__main__':
     #
     if analysis == 1:
         print("Analysis 1:")
-        options = {'season_select':'all','compute_form':compute_form,
+        options = {'season_select':'all','compute_form':compute_form,'league_name':league_name,
                 'window':0,'exclude_firstn':False, 'diff_features':False,
                     'home_advantage':'both','train_test_split':True}
         output = matches_for_analysis(1,**options)
@@ -729,7 +730,7 @@ if __name__ == '__main__':
         home_advantage = 'both' #'goals','points'
         diff_features = False
 
-        options = {'season_select':'all','compute_form':compute_form,
+        options = {'season_select':'all','compute_form':compute_form,'league_name':league_name,
                     'exclude_firstn':True,'diff_features':diff_features, 
                     'home_advantage':home_advantage,'train_test_split':True}
 

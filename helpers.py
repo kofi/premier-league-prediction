@@ -59,12 +59,12 @@ def import_datasets():
     #print('... completing the data import')
 
 def preprocess_matches_for_season(seasons, compute_form = False,
-            window=3, exclude_firstn=True, home_advantage=None):
+            window=3, exclude_firstn=True, home_advantage=None,league_name="England"):
     '''
     do all the preprocessing and return a matches dataframe ready
     for learning
     '''
-    matches = get_all_seasons_data(seasons) #matches, team_attributes)
+    matches = get_all_seasons_data(seasons,league_name=league_name) #matches, team_attributes)
 
     if home_advantage:
         if home_advantage == 'points':
@@ -79,7 +79,7 @@ def preprocess_matches_for_season(seasons, compute_form = False,
 
     if compute_form:
         matches = merge_matches_with_form(matches=matches,
-                        seasons=seasons,window=window)
+                        seasons=seasons,window=window,league_name=league_name)
     return matches
 
 def get_all_matches():
@@ -154,30 +154,32 @@ def get_season_as_date(season):
 
 def get_matches_for_season(season=None,league_name='England'):
     '''
-        Get matches for each season
+        Get matches for each season and league
     '''
-    league_id = get_league_id(league_name=league_name)
+
     matches = get_all_matches()
-    matches = matches[matches['league_id']==league_id]
+    if league_name is not None:
+        league_id = get_league_id(league_name=league_name)
+        matches = matches[matches['league_id']==league_id]
+
     if season is not None:
         matches = matches[matches['season'].str.contains(season)]
 
     return matches
 
-def get_matches_for_seasons(seasons):
+def get_matches_for_seasons(seasons,league_name="England"):
     '''
     Get matches for multiple seasons
     '''
     if seasons is None:
         #print("shouldnt be here")
-        return get_matches_for_season(season = None)
+        return get_matches_for_season(season = None,league_name=league_name)
     start_season = seasons[0]
-    matches = get_matches_for_season(start_season)
+    matches = get_matches_for_season(season=start_season,league_name=league_name)
 
     for s in range(1,len(seasons)):
-        #print("or here yet")
-        matches = matches.append(get_matches_for_season(seasons[s]),
-                                 ignore_index=True)
+        matches = matches.append(get_matches_for_season(season=seasons[s],
+                                league_name=league_name), ignore_index=True)
 
     return matches
 
@@ -290,7 +292,7 @@ def merge_matches_attributes(matches, team_attributes):
     return matches
 
 def merge_matches_with_form(matches, seasons=None, window=3,
-                            exclude_firstn=True):
+                            exclude_firstn=True,league_name="England"):
     '''
         Generate the matches with form dataframe
     '''
@@ -304,7 +306,7 @@ def merge_matches_with_form(matches, seasons=None, window=3,
 
         mwf = pd.read_pickle(pickname)
     except Exception as e:
-        mwf = get_all_seasons_data(None)
+        mwf = get_all_seasons_data(None,league_name=league_name)
         mwf = compute_all_forms(mwf,window=window)
         mwf.to_pickle(pickname)
 
@@ -398,11 +400,11 @@ def encode_matches(matches, ignore_columns=None):
     #print("Matches shape after encode up {}".format(matches.shape))
     return matches
 
-def get_all_seasons_data(seasons): #matches,tattr):
+def get_all_seasons_data(seasons,league_name="England"): #matches,tattr):
     '''
     get the number of unique seasons in the matches dataframe
     '''
-    matches = get_matches_for_seasons(seasons)
+    matches = get_matches_for_seasons(seasons=seasons,league_name=league_name)
     matches = matches[matches.columns[:11]]
     # get attributes
     tattr = get_attributes_for_seasons(seasons)
