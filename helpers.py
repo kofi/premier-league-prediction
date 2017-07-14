@@ -307,7 +307,7 @@ def merge_matches_with_form(matches, seasons=None, window=3,
         mwf = pd.read_pickle(pickname)
     except Exception as e:
         mwf = get_all_seasons_data(None,league_name=league_name)
-        mwf = compute_all_forms(mwf,window=window,leage_name=leage_name)
+        mwf = compute_all_forms(mwf,window=window,league_name=league_name)
         mwf.to_pickle(pickname)
 
     # filter the season ...
@@ -533,7 +533,7 @@ def compute_goal_based_home_advantage(matches,column='home_advantage'):
 
     return matches
 
-def compute_all_forms(matches,window=3,leage_name='England'):
+def compute_all_forms(matches,window=3,league_name='England'):
     #print(matches.info())
     #print(matches.columns.T)
     #sorted_matches = matches.sort_values(by=['match_id'],axis=0)

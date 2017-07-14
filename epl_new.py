@@ -689,8 +689,8 @@ def plot_match_hometeam_outcomes_by_season(matches,league_name='England'):
 # Run through the sequence of analyses
 if __name__ == '__main__':
 
-    analysis = 1
-    league_name = "Germany"
+    analysis = 2
+    league_name = "England"
 
     # run EDA analysis
     if analysis == 0:
