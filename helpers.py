@@ -21,7 +21,7 @@ import pprint
 #import re
 
 
-def import_datasets():
+def import_datasets(league_name="England"):
     '''
         Get matches for each season
     '''
@@ -30,32 +30,32 @@ def import_datasets():
     con = sql.connect('../input/database.sqlite')
     # get the leagues
     try:
-        pd.read_pickle('all_leagues.p')
+        pd.read_pickle('all_leagues_{}.p'.format(league_name))
     except Exception:
         query = "select * from League"
         all_leagues = pd.read_sql(query, con=con)
-        all_leagues.to_pickle('all_leagues.p')
+        all_leagues.to_pickle('all_leagues_{}.p'.format(league_name))
     # get the matches
     try:
-        pd.read_pickle('all_matches.p')
+        pd.read_pickle('all_matches_{}.p'.format(league_name))
     except Exception:
         query = "Select * from Match"
         all_matches = pd.read_sql(query, con=con)
-        all_matches.to_pickle('all_matches.p')
+        all_matches.to_pickle('all_matches_{}.p'.format(league_name))
     # get the teams
     try:
-        pd.read_pickle('all_teams.p')
+        pd.read_pickle('all_teams_{}.p'.format(league_name))
     except Exception:
         query = "Select * from Team"
         all_teams = pd.read_sql(query, con=con)
-        all_teams.to_pickle('all_teams.p')
+        all_teams.to_pickle('all_teams_{}.p'.format(league_name))
     # get the team attributes
     try:
-        pd.read_pickle('all_team_attributes.p')
+        pd.read_pickle('all_team_attributes_{}.p'.format(league_name))
     except Exception:
         query = "Select * from Team_Attributes"
         all_team_attributes = pd.read_sql(query, con=con)
-        all_team_attributes.to_pickle('all_team_attributes.p')
+        all_team_attributes.to_pickle('all_team_attributes_{}.p'.format(league_name))
     #print('... completing the data import')
 
 def preprocess_matches_for_season(seasons, compute_form = False,
@@ -82,49 +82,49 @@ def preprocess_matches_for_season(seasons, compute_form = False,
                         seasons=seasons,window=window,league_name=league_name)
     return matches
 
-def get_all_matches():
+def get_all_matches(league_name="England"):
     '''
     return the dataframe of leagues
     '''
     try:
-        matches = pd.read_pickle('all_matches.p')
+        matches = pd.read_pickle('all_matches_{}.p'.format(league_name))
     except Exception as e:
         import_datasets()
-        matches = pd.read_pickle('all_matches.p')
+        matches = pd.read_pickle('all_matches_{}.p'.format(league_name))
     return matches
 
-def get_all_leagues():
+def get_all_leagues(league_name="England"):
     '''
     return the dataframe of leagues
     '''
     try:
-        leagues = pd.read_pickle('all_leagues.p')
+        leagues = pd.read_pickle('all_leagues_{}.p'.format(league_name))
     except Exception as e:
         import_datasets()
-        leagues = pd.read_pickle('all_leagues.p')
+        leagues = pd.read_pickle('all_leagues_{}.p'.format(league_name))
     return leagues
 
-def get_all_teams():
+def get_all_teams(league_name='England'):
     '''
     return the dataframe of teams
     '''
     try:
-        teams = pd.read_pickle('all_teams.p')
+        teams = pd.read_pickle('all_teams_{}.p'.format(league_name))
         teams.shape
     except Exception as e:
         import_datasets()
-        teams = pd.read_pickle('all_teams.p')
+        teams = pd.read_pickle('all_teams_{}.p'.format(league_name))
     return teams
 
-def get_all_team_attributes():
+def get_all_team_attributes(league_name='England'):
     '''
     return the dataframe of team_attributes
     '''
     try:
-        team_attributes = pd.read_pickle('all_team_attributes.p')
+        team_attributes = pd.read_pickle('all_team_attributes_{}.p'.format(league_name))
     except Exception as e:
         import_datasets()
-        team_attributes = pd.read_pickle('all_team_attributes.p')
+        team_attributes = pd.read_pickle('all_team_attributes_{}.p'.format(league_name))
     return team_attributes
 
 def get_team_id(team_name):
@@ -301,13 +301,13 @@ def merge_matches_with_form(matches, seasons=None, window=3,
                'home_team_lose_average', 'away_team_lose_average']
 
     # get the matches with form
-    pickname = 'matches_with_form_{}.p'.format(window)
+    pickname = 'matches_with_form_{}_{}.p'.format(window,league_name)
     try:
 
         mwf = pd.read_pickle(pickname)
     except Exception as e:
         mwf = get_all_seasons_data(None,league_name=league_name)
-        mwf = compute_all_forms(mwf,window=window)
+        mwf = compute_all_forms(mwf,window=window,leage_name=leage_name)
         mwf.to_pickle(pickname)
 
     # filter the season ...
@@ -396,7 +396,7 @@ def encode_matches(matches, ignore_columns=None):
         cat_list = [x for x in cat_list if x not in ignore_columns]
     #print("cat list: {}".format(cat_list))
     # then encode those columns ...
-    matches = pd.get_dummies(matches, prefix=cat_list, columns=cat_list)
+    matches = pd.get_dummies(matches, prefix=cat_list, columns=cat_list,drop_first=True)
     #print("Matches shape after encode up {}".format(matches.shape))
     return matches
 
@@ -533,7 +533,7 @@ def compute_goal_based_home_advantage(matches,column='home_advantage'):
 
     return matches
 
-def compute_all_forms(matches,window=3):
+def compute_all_forms(matches,window=3,leage_name='England'):
     #print(matches.info())
     #print(matches.columns.T)
     #sorted_matches = matches.sort_values(by=['match_id'],axis=0)
@@ -667,7 +667,7 @@ def compute_all_forms(matches,window=3):
         #print("matches size {}".format(matches.shape))
 
     matches.sort_values(by=['match_date'],axis=0,inplace=True)
-    matches.to_csv("matches_with_form_{}.csv".format(window), encoding='utf-8')
+    matches.to_csv("matches_with_form_{}_{}.csv".format(window,league_name), encoding='utf-8')
     return matches
 
 

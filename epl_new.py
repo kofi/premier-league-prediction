@@ -239,12 +239,12 @@ def perform_eda_for_matches_1():
     # seaborn plots
     # plot the home team data
     sbn.pairplot(matches[home_columns])
-    print(matches[home_columns].columns.T)
-    print(matches[home_columns].describe())
+    #print(matches[home_columns].columns.T)
+    #print(matches[home_columns].describe())
     sbn.plt.show()
 
-    print(matches[away_columns].columns.T)
-    print(matches[away_columns].describe())
+    #print(matches[away_columns].columns.T)
+    #print(matches[away_columns].describe())
     sbn.plt.show()
 
 def perform_eda_for_matches_2():
@@ -303,6 +303,7 @@ def perform_eda_for_matches_2():
                     win_bar = axes[r,c].bar(i, frame.loc[i]['Won'],width = bar_width,color = 'g')
                     drew_bar = axes[r,c].bar(i-bar_width, frame.loc[i]['Drew'], width = bar_width, color = 'y')
                     lost_bar = axes[r,c].bar(i-2*bar_width, frame.loc[i]['Lost'], width = bar_width, color = 'b')
+                    input()
                     
                     #axes[r,c].set_xticklabels(values, fontsize= 6)
                     #plt.legend((win_bar[0], drew_bar[0], lost_bar),('Won', 'Drew','Lost'), framealpha = 0.8)
@@ -316,12 +317,14 @@ def perform_eda_for_matches_2():
                 # 'Fares' has larger range of values than 'Age' so create more bins
                 bins = np.arange(0, matches[col].max() + 10, 10)
 
-                wins = matches[matches['home_team_outcome'] == 'win'][col].reset_index(drop = True)
-                losses = matches[matches['home_team_outcome'] == 'lose'][col].reset_index(drop = True)
-                draws = matches[matches['home_team_outcome'] == 'draw'][col].reset_index(drop = True)       
-                axes[r,c].hist(wins,bins = bins,alpha = 0.6,color = 'g',label = 'Won', normed=True)
-                axes[r,c].hist(draws, bins = bins, alpha = 0.6,color = 'y',label = 'Drew',normed=True)
-                axes[r,c].hist(losses, bins = bins, alpha = 0.6, color = 'b',label = 'Lost',normed=True)                
+                if bins > 1:
+                    wins = matches[matches['home_team_outcome'] == 'win'][col].reset_index(drop = True)
+                    losses = matches[matches['home_team_outcome'] == 'lose'][col].reset_index(drop = True)
+                    draws = matches[matches['home_team_outcome'] == 'draw'][col].reset_index(drop = True)       
+                    axes[r,c].hist(wins,bins = bins,alpha = 0.6,color = 'g',label = 'Won', normed=True)
+                    axes[r,c].hist(draws, bins = bins, alpha = 0.6,color = 'y',label = 'Drew',normed=True)
+                    axes[r,c].hist(losses, bins = bins, alpha = 0.6, color = 'b',label = 'Lost',normed=True)    
+                    input()            
 
     # for label in (axes.get_xticklabels() + ax.get_yticklabels()):
     #     label.set_fontname('Arial')
@@ -336,7 +339,7 @@ def perform_eda_for_matches_2():
 def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
                 compute_form= False, window=3, exclude_firstn=True,
                 diff_features= False, home_advantage=None,istrain=False,
-                train_test_split=False,league_name="England"):
+                train_test_split=False,league_name="England",dropna=True):
 
     season_selectors = {
         'random':get_random_seasons,
@@ -399,10 +402,10 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
     print("")
 
     # drop Nan rows
-    allnas = matches.isnull().any()
-
-    if (sum(allnas == True)):
-        matches.dropna(inplace=True)
+    if dropna:
+        allnas = matches.isnull().any()
+        if (sum(allnas == True)):
+            matches.dropna(inplace=True)
     #print("Shape of X after dropna: {}".format(matches.shape))
     #print(matches.columns.T)
     #print("Dataframe shape after dropping rows {}".format(matches.shape))
@@ -452,7 +455,10 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
     try:
         # for SVC we need to scale both the test and training sets at the same time
         # http://scikit-learn.org/stable/modules/svm.html#tips-on-practical-use
-        ss = StandardScaler().fit(matches_sub.append(test_matches_sub))
+        if train_test_split:
+            ss = StandardScaler().fit(matches_sub.append(test_matches_sub))
+        else:
+            ss = StandardScaler().fit(matches_sub)
         X =np.array(ss.transform(matches_sub)) # np.array(StandardScaler().fit_transform(matches_sub))
         if train_test_split:
             ss = StandardScaler().fit(test_matches_sub)
@@ -569,7 +575,7 @@ def plot_analysis_1(data):
         ax[pltcnt].set_xlabel('# of Seasons in data')
         ax[pltcnt].set_ylabel('Score value')
         pltcnt = pltcnt + 1
-    plt.show()
+        plt.show()
 
 # generate the ROC curves for a given clf and data
 def plot_roc_curves(X,y,clf,train_rows,kwargs=None):
@@ -657,20 +663,43 @@ def plot_roc_curves(X,y,clf,train_rows,kwargs=None):
     plt.legend(loc="lower right")
     plt.show()
 
+def plot_match_hometeam_outcomes_by_season(matches,league_name='England'):
+    '''
+        Plot variation of home wins 
+    '''
+    if matches is None:
+        exit()
+
+    matches = matches[['season','home_team_outcome']]
+    matches = pd.get_dummies(matches, prefix=['home_team_outcome'], columns=['home_team_outcome'])
+    to_rename = {'home_team_outcome_win':'win',
+                    'home_team_outcome_draw':'draw','home_team_outcome_lose':'lose'}
+    #print(matches.columns)
+    matches.rename(columns=to_rename, inplace=True)
+    # mgroups = matches.groupby(['season','home_team_outcome'])[['home_team_outcome']].count()
+    mgroups = matches.pivot_table(['win','draw','lose'],index='season')
+    mgroups.plot()
+    #plt.tight_layout()
+    plt.title("Distribution of home wins/draws/losses by season ({} league)".format(league_name))
+    plt.xlabel('Season')
+    plt.ylabel('Fraction of Games')
+    plt.show()
+    input()
 
 # Run through the sequence of analyses
 if __name__ == '__main__':
 
-    analysis = 2
+    analysis = 1
     league_name = "Germany"
 
     # run EDA analysis
     if analysis == 0:
         perform_eda_for_matches_1()
         perform_eda_for_matches_2()
+        exit()
 
     print("Importing data ... ")
-    h.import_datasets()
+    h.import_datasets(league_name)
     #setup a few data structures to store results
     all_runs = []
     all_entropies = []
@@ -706,11 +735,17 @@ if __name__ == '__main__':
     # use all data and get the basic scores
     #
     if analysis == 1:
+        # plot the performance of each of the algorithms for default data
+        # no windows, no calculation of forms
+        # no diffs, no PCA 
         print("Analysis 1:")
         options = {'season_select':'all','compute_form':compute_form,'league_name':league_name,
                 'window':0,'exclude_firstn':False, 'diff_features':False,
-                    'home_advantage':'both','train_test_split':True}
+                    'home_advantage':'both','train_test_split':False}
         output = matches_for_analysis(1,**options)
+        # plot the win-draw-loss ratios for 
+        plot_match_hometeam_outcomes_by_season(output['rawdata'],league_name=league_name)
+        #exit()
         df_scores = analysis_1('all', clfs, output, pipeline_pca=False,debug=True)
         all_runs.append(df_scores.reset_index())
         dfa = pd.concat(all_runs,ignore_index= True)
@@ -718,6 +753,7 @@ if __name__ == '__main__':
         print(dfa.drop('cnf_matrix',axis=1))
         print("Confusion Matrices")
         pprint.pprint(dfa['cnf_matrix'])
+        #plot_analysis_1(dfa.drop('cnf_matrix',axis=1))
 
     
     if analysis == 2:
