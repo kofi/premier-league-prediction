@@ -371,10 +371,10 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
     #print("Shape before cleanup and encode: {}".format(matches.shape))
 
     # clean up
-    matches = h.clean_up_matches(matches,ignore_columns=['season'])
+    matches = h.clean_up_matches(matches,ignore_columns=['season','stage'])
     #print("Matches shape B before encode {}".format(matches.shape))
 
-    matches = h.encode_matches(matches,ignore_columns=['season'])
+    matches = h.encode_matches(matches,ignore_columns=['season','stage'])
     #print("Matches shape C after encode {}".format(matches.shape))
     #print("Shape after cleanup and encode: {}".format(matches.shape))
 
@@ -437,10 +437,10 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
         y_test = np.array(test_matches['home_team_outcome'])
 
     # then delete columns
-    matches_sub = matches.drop(['home_team_points','home_team_goal', 'season',
+    matches_sub = matches.drop(['home_team_points','home_team_goal', 'season','stage',
                         'away_team_goal', 'home_team_outcome','season'], axis=1) #
     if train_test_split:
-        test_matches_sub = test_matches.drop(['home_team_points','home_team_goal', 'season',
+        test_matches_sub = test_matches.drop(['home_team_points','home_team_goal', 'season','stage',
                         'away_team_goal', 'home_team_outcome','season'], axis=1)
         
     #print("Shape of matches after drop columns: {}".format(matches_sub.shape))
@@ -663,34 +663,38 @@ def plot_roc_curves(X,y,clf,train_rows,kwargs=None):
     plt.legend(loc="lower right")
     plt.show()
 
-def plot_match_hometeam_outcomes_by_season(matches,league_name='England'):
+def plot_match_hometeam_outcomes_by(matches,index_column='season',league_name='England'):
     '''
         Plot variation of home wins 
     '''
     if matches is None:
         exit()
-
-    matches = matches[['season','home_team_outcome']]
+    nseasons = len(matches['season'].unique())
+    matches = matches[[index_column,'home_team_outcome']]
     matches = pd.get_dummies(matches, prefix=['home_team_outcome'], columns=['home_team_outcome'])
     to_rename = {'home_team_outcome_win':'win',
                     'home_team_outcome_draw':'draw','home_team_outcome_lose':'lose'}
     #print(matches.columns)
     matches.rename(columns=to_rename, inplace=True)
     # mgroups = matches.groupby(['season','home_team_outcome'])[['home_team_outcome']].count()
-    mgroups = matches.pivot_table(['win','draw','lose'],index='season')
+    mgroups = matches.pivot_table(['win','draw','lose'],index=index_column)
     mgroups.plot()
+
     #plt.tight_layout()
-    plt.title("Distribution of home wins/draws/losses by season ({} league)".format(league_name))
-    plt.xlabel('Season')
+    plt.title("Variation of home wins/draws/losses by {} ({} league,{} season)".format(index_column,
+                            league_name,nseasons))
+    plt.xlabel(index_column.title())
     plt.ylabel('Fraction of Games')
+    plt.savefig('variation_home_outcomes_by_{}_{}.png'.format(index_column.title(),league_name),
+            format='png')
     plt.show()
     input()
 
 # Run through the sequence of analyses
 if __name__ == '__main__':
 
-    analysis = 2
-    league_name = "England"
+    analysis = 1
+    league_name = "Spain"
 
     # run EDA analysis
     if analysis == 0:
@@ -742,9 +746,11 @@ if __name__ == '__main__':
         options = {'season_select':'all','compute_form':compute_form,'league_name':league_name,
                 'window':0,'exclude_firstn':False, 'diff_features':False,
                     'home_advantage':'both','train_test_split':False}
+        all_runs = []
         output = matches_for_analysis(1,**options)
         # plot the win-draw-loss ratios for 
-        plot_match_hometeam_outcomes_by_season(output['rawdata'],league_name=league_name)
+        plot_match_hometeam_outcomes_by(output['rawdata'],index_column='season',league_name=league_name)
+        plot_match_hometeam_outcomes_by(output['rawdata'],index_column='stage',league_name=league_name)
         #exit()
         df_scores = analysis_1('all', clfs, output, pipeline_pca=False,debug=True)
         all_runs.append(df_scores.reset_index())
