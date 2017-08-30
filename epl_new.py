@@ -359,6 +359,12 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
                 'home_advantage':home_advantage,'league_name':league_name}
 
     matches = h.preprocess_matches_for_season(season,**options)
+    print(matches.columns.T)
+    print(matches.describe())
+    print(matches.info())
+    print('print(matches.head().T)')
+    print(matches.head())
+    exit(0)
 
     # filter out only the matches with the team of interest
     if filter_team:
@@ -396,9 +402,9 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
     percent_home_draw = np.sum(matches['home_team_points'] == 1)/(1. * np.max(matches.shape[0]))
     win_stats = [percent_home_win, percent_home_loss, percent_home_draw]
     matches_entropy = -np.sum([k*math.log(k,2) for k in win_stats])
-    #print("Home team {:.3f} wins, {:.2f} losses, {:.2f} draws".format(
-    #        100*percent_home_win,100*percent_home_loss,100*percent_home_draw))
-    #print("Matches entropy: {:f}".format(matches_entropy))
+    print("Home team {:.3f}% wins, {:.2f}% losses, {:.2f}% draws".format(
+            100*percent_home_win,100*percent_home_loss,100*percent_home_draw))
+    print("Matches entropy: {:f}".format(matches_entropy))
     print("")
 
     # drop Nan rows
@@ -694,7 +700,7 @@ def plot_match_hometeam_outcomes_by(matches,index_column='season',league_name='E
 if __name__ == '__main__':
 
     analysis = 1
-    league_name = "Spain"
+    league_name = "England"
 
     # run EDA analysis
     if analysis == 0:
