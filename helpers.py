@@ -92,9 +92,9 @@ def get_all_matches(league_name="England"):
         import_datasets()
         matches = pd.read_pickle('all_matches_{}.p'.format(league_name))
 
-    print("Matches Info:")
-    print(matches.info())
-    print(matches.head())
+    #print("Matches Info:")
+    #print(matches.info())
+    #print(matches.head())
     return matches
 
 def get_all_leagues(league_name="England"):
@@ -118,9 +118,9 @@ def get_all_teams(league_name='England'):
     except Exception as e:
         import_datasets()
         teams = pd.read_pickle('all_teams_{}.p'.format(league_name))
-    print("Team Info:")
-    print(teams.info())
-    print(teams.head())
+    #print("Team Info:")
+    #print(teams.info())
+    #print(teams.head())
     return teams
 
 def get_all_team_attributes(league_name='England'):
@@ -132,9 +132,9 @@ def get_all_team_attributes(league_name='England'):
     except Exception as e:
         import_datasets()
         team_attributes = pd.read_pickle('all_team_attributes_{}.p'.format(league_name))
-    print("Team Attributes Info:")
-    print(team_attributes.info())
-    print(team_attributes.head())    
+    #print("Team Attributes Info:")
+    #print(team_attributes.info())
+    #print(team_attributes.head())    
     return team_attributes
 
 def get_team_id(team_name):

@@ -104,9 +104,11 @@ def get_scores(clf, X, y):
     f1 = f1_score(y, clf.predict(X),average='weighted')
     ll = log_loss(y,clf.predict_proba(X))
     scores =  {'score': gen_score, 'f1_score': f1, 'log_loss': ll}
+        
     #print("{0} score:{score}, f1 score:{f1_score},
     #logloss:{log_loss}".format(type(clf).__name__,**scores))
     return scores
+
 
 
 def run_kfolds(X,y,clf_class,**kwargs):
@@ -247,6 +249,8 @@ def perform_eda_for_matches_1():
     #print(matches[away_columns].describe())
     sbn.plt.show()
 
+
+
 def perform_eda_for_matches_2():
     
     options = {'compute_form':False,
@@ -359,12 +363,12 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
                 'home_advantage':home_advantage,'league_name':league_name}
 
     matches = h.preprocess_matches_for_season(season,**options)
-    print(matches.columns.T)
-    print(matches.describe())
-    print(matches.info())
-    print('print(matches.head().T)')
-    print(matches.head())
-    exit(0)
+    #print(matches.columns.T)
+    #print(matches.describe())
+    #print(matches.info())
+    #print('print(matches.head().T)')
+    #print(matches.head())
+    #exit(0)
 
     # filter out only the matches with the team of interest
     if filter_team:
@@ -740,18 +744,75 @@ if __name__ == '__main__':
         {'clf':OneVsRestClassifier, 
             'params':{'estimator': sgdc_clf}}]
         #'params':{'loss':'log','alpha':0.001,'n_iter':100}}}]
-
+    
     # Analysis 1:
     # use all data and get the basic scores
     #
     if analysis == 1:
+        print("Analysis {}:".format(analysis))
+        home_advantage = 'both'
+        window = 0
+        options = {'season_select':'all', 'compute_form':compute_form,
+                    'exclude_firstn':False, 'diff_features': False, 
+                    'home_advantage':home_advantage,'window':window,'istrain':False,'train_test_split':True}
+
+        print("Get training data")        
+        output = matches_for_analysis(1,**options)
+
+        X_train, y_train = output['X'], output['y']
+        X_test, y_test = output['X_test'], output['y_test']
+        print("Columns:")
+        pprint.pprint(output['data'].columns)
+        print_spacer()
+
+        for k in range(len(clfs)):
+            c = clfs[k]
+            #print(c)
+            clf_class = c['clf']
+            kwargs = c['params']
+            clf = clf_class(**kwargs)
+            clfname = clf.__class__.__name__
+            if 'estimator' in kwargs: # 'OneVsRestClassifier':
+                clfname = clfname + kwargs['estimator'].__class__.__name__
+            if 'base_estimator' in kwargs: # 'OneVsRestClassifier':
+                clfname = clfname + kwargs['base_estimator'].__class__.__name__
+            if 'kernel' in kwargs:
+                clfname = ("{}_{}".format(clfname,kwargs['kernel']))
+            print(clfname)
+            # then fit the training data fold
+            try:
+                clf.fit(X_train,y_train)
+                # get the training metrics
+                train_score = get_scores(clf, X_train, y_train)
+                print("Train score:")
+                pprint.pprint(train_score)
+                print("Test Confusion Matrix:")
+                print(output_class)
+                print_conf_matrix(y_train,clf.predict(X_train))
+                print()
+                # get the test metrics
+                test_score = get_scores(clf, X_test, y_test)
+                print("Test score:")
+                pprint.pprint(test_score)
+                print("Test Confusion Matrix:")
+                print(output_class)
+                print_conf_matrix(y_test,clf.predict(X_test))
+
+            except Exception:
+                print("Could not run")
+            print()
+            print_spacer()
+
+    # Analysis 2:
+    # use all data and get the basic scores using cross-validation since the dataset is not that large
+    #
+    if analysis == 2:
         # plot the performance of each of the algorithms for default data
         # no windows, no calculation of forms
         # no diffs, no PCA 
-        print("Analysis 1:")
-        options = {'season_select':'all','compute_form':compute_form,'league_name':league_name,
-                'window':0,'exclude_firstn':False, 'diff_features':False,
-                    'home_advantage':'both','train_test_split':False}
+        print("Analysis {}:".format(analysis))
+        options = {'season_select':'all','compute_form':compute_form,
+                 'league_name':league_name, 'window':0,'exclude_firstn':False, 'diff_features':False,'home_advantage':'both','train_test_split':False}
         all_runs = []
         output = matches_for_analysis(1,**options)
         # plot the win-draw-loss ratios for 
@@ -768,8 +829,8 @@ if __name__ == '__main__':
         #plot_analysis_1(dfa.drop('cnf_matrix',axis=1))
 
     
-    if analysis == 2:
-        print("Analysis 2:")
+    if analysis == 3:
+        print("Analysis {}:".format(analysis))
         all_runs = []
         all_entropies = []
         do_plots = False
@@ -847,8 +908,8 @@ if __name__ == '__main__':
             dfa_windows.drop('cnf_matrix',axis=1).to_csv("{}_var_with_window.csv".format(sc), encoding='utf-8')
 
         
-    if analysis == 3:
-        print("Analysis 3: SVC Parameter tuning")
+    if analysis == 4:
+        print("Analysis {}: SVC Parameter tuning".format(analysis))
         do_plots = False
         debug = True
         compute_form = True
@@ -933,9 +994,9 @@ if __name__ == '__main__':
         #plt.yticks(rotation=0) 
         plt.show()
 
-    if analysis == 4:
+    if analysis == 5:
         # running a test on the test data
-        print("Analysis 4:")
+        print("Analysis {}:".format(analysis))
 
         C =   569.04542855790191 #4862.8956398672553 # 569.04542855790191 #6221.488221346056 #1638.0284049793586
         gamma = 0.0001 #0.00001 #0.0001# 6.3636363636363641e-05 #0.0001
