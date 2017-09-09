@@ -1,0 +1,253 @@
+Importing data ... 
+Analysis 1:
+Get training data
+Seasons: ['2009/2010', '2010/2011', '2011/2012', '2013/2014', '2014/2015', '2015/2016']
+Home team 46.096% wins, 28.55% losses, 25.35% draws
+Matches entropy: 1.533261
+
+
+Columns:
+Index(['home_buildUpPlaySpeed', 'home_buildUpPlayPassing',
+       'home_chanceCreationPassing', 'home_chanceCreationCrossing',
+       'home_chanceCreationShooting', 'home_defencePressure',
+       'home_defenceAggression', 'home_defenceTeamWidth',
+       'away_buildUpPlaySpeed', 'away_buildUpPlayPassing',
+       'away_chanceCreationPassing', 'away_chanceCreationCrossing',
+       'away_chanceCreationShooting', 'away_defencePressure',
+       'away_defenceAggression', 'away_defenceTeamWidth', 'advantage_home',
+       'home_buildUpPlaySpeedClass_Fast', 'home_buildUpPlaySpeedClass_Slow',
+       'home_buildUpPlayDribblingClass_Normal',
+       'home_buildUpPlayPassingClass_Mixed',
+       'home_buildUpPlayPassingClass_Short',
+       'home_buildUpPlayPositioningClass_Organised',
+       'home_chanceCreationPassingClass_Risky',
+       'home_chanceCreationPassingClass_Safe',
+       'home_chanceCreationCrossingClass_Lots',
+       'home_chanceCreationCrossingClass_Normal',
+       'home_chanceCreationShootingClass_Lots',
+       'home_chanceCreationShootingClass_Normal',
+       'home_chanceCreationPositioningClass_Organised',
+       'home_defencePressureClass_High', 'home_defencePressureClass_Medium',
+       'home_defenceAggressionClass_Double',
+       'home_defenceAggressionClass_Press',
+       'home_defenceTeamWidthClass_Normal', 'home_defenceTeamWidthClass_Wide',
+       'away_buildUpPlaySpeedClass_Fast', 'away_buildUpPlaySpeedClass_Slow',
+       'away_buildUpPlayDribblingClass_Normal',
+       'away_buildUpPlayPassingClass_Mixed',
+       'away_buildUpPlayPassingClass_Short',
+       'away_buildUpPlayPositioningClass_Organised',
+       'away_chanceCreationPassingClass_Risky',
+       'away_chanceCreationPassingClass_Safe',
+       'away_chanceCreationCrossingClass_Lots',
+       'away_chanceCreationCrossingClass_Normal',
+       'away_chanceCreationShootingClass_Lots',
+       'away_chanceCreationShootingClass_Normal',
+       'away_chanceCreationPositioningClass_Organised',
+       'away_defencePressureClass_High', 'away_defencePressureClass_Medium',
+       'away_defenceAggressionClass_Double',
+       'away_defenceAggressionClass_Press',
+       'away_defenceTeamWidthClass_Normal', 'away_defenceTeamWidthClass_Wide'],
+      dtype='object')
+----------------------------------------------------------------------------------------------------
+DummyClassifier
+Train score:
+{'f1_score': 0.30411334759448999,
+ 'log_loss': 18.191042877535171,
+ 'score': 0.47331536388140161}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[  0   0 460]
+ [  0   0 517]
+ [  0   0 878]]
+
+Test score:
+{'f1_score': 0.24622590265749747,
+ 'log_loss': 20.108829383559858,
+ 'score': 0.41778975741239893}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[  0   0 104]
+ [  0   0 112]
+ [  0   0 155]]
+
+----------------------------------------------------------------------------------------------------
+SVC_linear
+Train score:
+{'f1_score': 0.46899836932921662,
+ 'log_loss': 0.99929390028447318,
+ 'score': 0.46091644204851751}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[210 144 106]
+ [152 269  96]
+ [275 227 376]]
+
+Test score:
+{'f1_score': 0.37048729832921395,
+ 'log_loss': 1.0792043880365947,
+ 'score': 0.3692722371967655}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[47 32 25]
+ [40 34 38]
+ [64 35 56]]
+
+----------------------------------------------------------------------------------------------------
+SVC_rbf
+Train score:
+{'f1_score': 0.58646546941934141,
+ 'log_loss': 0.93996953437482433,
+ 'score': 0.58328840970350404}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[224 128 108]
+ [ 84 353  80]
+ [150 223 505]]
+
+Test score:
+{'f1_score': 0.42151056763858202,
+ 'log_loss': 1.0646600652431872,
+ 'score': 0.41778975741239893}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[37 39 28]
+ [30 51 31]
+ [51 37 67]]
+
+----------------------------------------------------------------------------------------------------
+SVC_precomputed
+Could not run
+
+----------------------------------------------------------------------------------------------------
+DecisionTreeClassifier
+Train score:
+{'f1_score': 0.99892258774663423,
+ 'log_loss': 0.0014946569931232831,
+ 'score': 0.99892183288409708}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[460   0   0]
+ [  1 516   0]
+ [  1   0 877]]
+
+Test score:
+{'f1_score': 0.34136376101074822,
+ 'log_loss': 22.622433056504843,
+ 'score': 0.34501347708894881}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[21 36 47]
+ [26 35 51]
+ [49 34 72]]
+
+----------------------------------------------------------------------------------------------------
+OneVsRestClassifierAdaBoostClassifier
+Train score:
+{'f1_score': 0.51710491502136058,
+ 'log_loss': 1.0931276166809465,
+ 'score': 0.55795148247978432}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[ 74 115 271]
+ [ 35 230 252]
+ [ 39 108 731]]
+
+Test score:
+{'f1_score': 0.32670882243013932,
+ 'log_loss': 1.0976055867108407,
+ 'score': 0.37735849056603776}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[  5  38  61]
+ [  4  33  75]
+ [  4  49 102]]
+
+----------------------------------------------------------------------------------------------------
+RandomForestClassifier
+Train score:
+{'f1_score': 0.98167375736711693,
+ 'log_loss': 0.27290749002095416,
+ 'score': 0.98167115902964963}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[451   1   8]
+ [  3 509   5]
+ [  8   9 861]]
+
+Test score:
+{'f1_score': 0.38585204754052899,
+ 'log_loss': 1.7494896300068026,
+ 'score': 0.40161725067385445}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[23 23 58]
+ [26 32 54]
+ [32 29 94]]
+
+----------------------------------------------------------------------------------------------------
+SGDClassifier
+Train score:
+{'f1_score': 0.49422202703594037,
+ 'log_loss': 1.0151256601517664,
+ 'score': 0.49703504043126684}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[132 147 181]
+ [ 93 261 163]
+ [166 183 529]]
+
+Test score:
+{'f1_score': 0.37754299550573817,
+ 'log_loss': 1.1222071894193957,
+ 'score': 0.38274932614555257}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[31 28 45]
+ [25 32 55]
+ [44 32 79]]
+
+----------------------------------------------------------------------------------------------------
+KNeighborsClassifier
+Train score:
+{'f1_score': 0.99946094817307785,
+ 'log_loss': 0.00074732849656269635,
+ 'score': 0.99946091644204849}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[460   0   0]
+ [  1 516   0]
+ [  0   0 878]]
+
+Test score:
+{'f1_score': 0.41223297008454918,
+ 'log_loss': 4.9473278583496496,
+ 'score': 0.42587601078167114}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[27 29 48]
+ [16 36 60]
+ [27 33 95]]
+
+----------------------------------------------------------------------------------------------------
+OneVsRestClassifierSGDClassifier
+Train score:
+{'f1_score': 0.4817518505101101,
+ 'log_loss': 0.98320357641098288,
+ 'score': 0.52938005390835574}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[ 56 104 300]
+ [ 30 209 278]
+ [ 29 132 717]]
+
+Test score:
+{'f1_score': 0.35440517921860637,
+ 'log_loss': 1.1116463223775483,
+ 'score': 0.41778975741239893}
+Test Confusion Matrix:
+['draw' 'lose' 'win']
+[[  8  24  72]
+ [  3  26  83]
+ [  7  27 121]]
+
+----------------------------------------------------------------------------------------------------

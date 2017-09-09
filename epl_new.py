@@ -39,6 +39,7 @@ from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import log_loss
+from sklearn.metrics import make_scorer
 
 from sklearn.dummy import DummyClassifier
 from sklearn.svm import SVC
@@ -63,6 +64,8 @@ from sklearn.preprocessing import label_binarize
 from scipy import interp
 from itertools import cycle
 
+import matplotlib.ticker as plticker
+from matplotlib.ticker import FormatStrFormatter
 
 import warnings
 warnings.filterwarnings("ignore") #, category=DeprecationWarning)
@@ -176,11 +179,11 @@ def run_kfolds(X,y,clf_class,**kwargs):
     scores['cnf_matrix'] = cnf_matrix/(n_tests*1.0)
     scores['clf'] = clf.__class__.__name__
     if 'estimator' in kwargs: # 'OneVsRestClassifier':
-        scores['clf'] = kwargs['estimator'].__class__.__name__
-        # "{}_{}".format(scores['clf'], kwargs['estimator'].__class__.__name__)
+        scores['clf'] = "{}_{}".format(scores['clf'], kwargs['estimator'].__class__.__name__) #kwargs['estimator'].__class__.__name__
+        # 
     if 'base_estimator' in kwargs: # 'OneVsRestClassifier':
-        scores['clf'] = kwargs['base_estimator'].__class__.__name__
-        #"{}_{}".format(scores['clf'],kwargs['base_estimator'].__class__.__name__)
+        scores['clf'] = "{}_{}".format(scores['clf'],kwargs['base_estimator'].__class__.__name__)
+        #kwargs['base_estimator'].__class__.__name__
     if 'kernel' in kwargs:
         scores['clf'] = ("{}_{}".format(scores['clf'],kwargs['kernel']))
     return scores
@@ -703,7 +706,7 @@ def plot_match_hometeam_outcomes_by(matches,index_column='season',league_name='E
 # Run through the sequence of analyses
 if __name__ == '__main__':
 
-    analysis = 1
+    analysis = 4
     league_name = "England"
 
     # run EDA analysis
@@ -731,8 +734,8 @@ if __name__ == '__main__':
                 'decision_function_shape':'ovr', 'probability':True}},
         {'clf': SVC, 'params':{'kernel':'rbf', 'class_weight':'balanced', 
             'decision_function_shape':'ovr', 'probability':True}},
-        {'clf': SVC, 'params':{'kernel':'precomputed', 'class_weight':'balanced', 
-            'decision_function_shape':'ovr', 'probability':True}},
+        # {'clf': SVC, 'params':{'kernel':'precomputed', 'class_weight':'balanced', 
+        #     'decision_function_shape':'ovr', 'probability':True}},
         #{'clf': CalibratedClassifierCV, 'params':{'base_estimator':lscv}},
         {'clf': DecisionTreeClassifier, 'params':{'random_state':0}},
         #{'clf': GNB, 'params':{}},
@@ -812,13 +815,14 @@ if __name__ == '__main__':
         # no diffs, no PCA 
         print("Analysis {}:".format(analysis))
         options = {'season_select':'all','compute_form':compute_form,
-                 'league_name':league_name, 'window':0,'exclude_firstn':False, 'diff_features':False,'home_advantage':'both','train_test_split':False}
+                 'league_name':league_name, 'window':0,'exclude_firstn':False, 'diff_features':False,'home_advantage':'both', 'istrain':True, 'train_test_split':False}
         all_runs = []
         output = matches_for_analysis(1,**options)
-        # plot the win-draw-loss ratios for 
-        plot_match_hometeam_outcomes_by(output['rawdata'],index_column='season',league_name=league_name)
-        plot_match_hometeam_outcomes_by(output['rawdata'],index_column='stage',league_name=league_name)
-        #exit()
+        # plot the win-draw-loss ratios by season
+        #plot_match_hometeam_outcomes_by(output['rawdata'],index_column='season',league_name=league_name)
+        # plot the win-draw-loss ratios by stage in season
+        #plot_match_hometeam_outcomes_by(output['rawdata'],index_column='stage',league_name=league_name)
+        
         df_scores = analysis_1('all', clfs, output, pipeline_pca=False,debug=True)
         all_runs.append(df_scores.reset_index())
         dfa = pd.concat(all_runs,ignore_index= True)
@@ -826,22 +830,24 @@ if __name__ == '__main__':
         print(dfa.drop('cnf_matrix',axis=1))
         print("Confusion Matrices")
         pprint.pprint(dfa['cnf_matrix'])
-        #plot_analysis_1(dfa.drop('cnf_matrix',axis=1))
+        #plot_analysis_1(dfa.drop('cnf_matrix',axis=1).drop('seasons',axis=))
 
-    
+    # Explore the impact of the additional features:
+    # 1. The team form features
+    # 2. The home team advantage features
     if analysis == 3:
         print("Analysis {}:".format(analysis))
         all_runs = []
         all_entropies = []
         do_plots = False
         debug = True
-        compute_form = True
-        home_advantage = 'both' #'goals','points'
+        compute_form = False
+        home_advantage = 'points' #'both' #'goals','points'
         diff_features = False
-
-        options = {'season_select':'all','compute_form':compute_form,'league_name':league_name,
-                    'exclude_firstn':True,'diff_features':diff_features, 
-                    'home_advantage':home_advantage,'train_test_split':True}
+        exclude_firstn = False
+        train_test_split = False
+    
+        options = {'season_select':'all','compute_form':compute_form,'league_name':league_name, 'exclude_firstn':exclude_firstn,'diff_features':diff_features, 'home_advantage':home_advantage,'train_test_split':train_test_split}
 
         window_range = 1 
         if compute_form:
@@ -862,7 +868,7 @@ if __name__ == '__main__':
                 # save the scores
                 all_runs.append(df_scores.reset_index())
 
-            dfa = pd.concat(all_runs,ignore_index= True) #, keys=range(len(all_seasons)))
+            dfa = pd.concat(all_runs,ignore_index= True) 
             if debug:
                 print()
                 print("Summary Results for window {}".format(window))
@@ -913,86 +919,122 @@ if __name__ == '__main__':
         do_plots = False
         debug = True
         compute_form = True
-        home_advantage = 'both'
+        home_advantage = None
         window = 14
         options = {'season_select':'all', 'compute_form':compute_form,
                  'exclude_firstn':True, 'diff_features': False, 
                  'home_advantage':home_advantage,'window':window,
-                 'train_test_split':True}
+                 'train_test_split':False,'istrain':False}
         
         output = matches_for_analysis(1,**options)
-        X, y = output['X'], output['y']
+        #X, y = output['X'], output['y']
+        X_train, y_train = output['X'], output['y']
+        #X_test, y_test = output['X_test'], output['y_test']
+
+        # f1 scorer
+        f1_scorer = make_scorer(f1_score, average='weighted')
 
         # iterate over SVC grid
-        C_range =  np.linspace(0.0001,3,40) #np.logspace(0.0001,5,100) # [0.01, 0.25, 0.5, .75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3,10,30,100] #np.linspace(0.001,0.03,15) # 3, 12)
-        gamma_range = np.linspace(0.0001,3,40) #np.linspace(0.0001,1,100) #[0, 1e-5, 1e-4,1e-3, .01, .1, .15, .2, .25, .5, .75, 1] # #np.linspace(1,7,15) #12)
+        C_range =  np.linspace(0.0001,3,40) 
+        gamma_range =  np.linspace(0.0001,3,40)#[:5] 
+        #np.linspace(0.0001,1,100) #[0, 1e-5, 1e-4,1e-3, .01, .1, .15, .2, .25, .5, .75, 1] # #np.linspace(1,7,15) #12)
+        #np.logspace(0.0001,5,100) # [0.01, 0.25, 0.5, .75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3,10,30,100] #np.linspace(0.001,0.03,15) # 3, 12)
         param_grid = dict(gamma=gamma_range, C=C_range)
         cv = StratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=42)
-        svc_params = {'kernel':'rbf', 'class_weight':'balanced','decision_function_shape':'ovr', 'probability':True}
-        grid = GridSearchCV(SVC(**svc_params), param_grid=param_grid, cv=cv,scoring='f1_weighted')
-        grid.fit(X, y)
+        svc_params = {'kernel':'rbf', 'class_weight':'balanced',
+                    'decision_function_shape':'ovr', 'probability':True}
+        grid = GridSearchCV(SVC(**svc_params), param_grid=param_grid, 
+                        cv=cv,scoring=f1_scorer)
+        grid.fit(X_train, y_train)
 
         print("The best parameters are %s with a score of %0.6f"
             % (grid.best_params_, grid.best_score_))
         
+        train_scores = grid.cv_results_['mean_test_score'].reshape(len(gamma_range),len(C_range))
+
+        plt.figure(figsize=(8, 6))
+        plt.xticks(rotation=45)
+        plt.yticks(rotation=0)
+        #plt.subplots_adjust(left=.2, right=0.95, bottom=0.15, top=0.95)
+        #plt.imshow(train_scores, interpolation='nearest', cmap=plt.cm.hot)
+        plt.title('Grid Search for F1 Score')
+        #plt.xlabel('C')
+        #plt.ylabel('gamma')
+
+        ax = sbn.heatmap(train_scores,  fmt=".4f")
+        ax.set_yticklabels(ax.get_yticklabels(), rotation = 0, fontsize = 8)
+        plt.yticks(np.arange(len(C_range)), C_range)
+        plt.xticks(np.arange(len(gamma_range)), gamma_range)
+        # loc = plticker.MultipleLocator(base=2*(max(gamma_range) - min(gamma_range))/(1. *len(gamma_range))) 
+        # ax.xaxis.set_major_locator(loc)
+        ax.xaxis.set_major_formatter(FormatStrFormatter('%.5f'))
+        # loc = plticker.MultipleLocator(base=5*(max(C_range) - min(C_range))/(1. *len(C_range)))
+        # ax.yaxis.set_major_locator(loc)
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.5f'))
+        #ax.set_xticks(ax.get_xticks()[::5])
+        #ax.set_yticks(ax.get_yticks()[::5])
+        ax.set(xlabel='gamma', ylabel='C')
+        plt.show()
+
 
         #input() 
 
-        #C_range = grid.best_params_['C']* np.linspace(0.95,1.05,19)#np.linspace(0.6,1.2,10)
-        #gamma_range =  grid.best_params_['gamma']* np.linspace(0.95,1.05,19) #np.linspace(0.5,1.,10)
-        #0.0001*np.linspace(0.6,1.1,11) #0.0001*np.linspace(0.8,1.2,11)
-        all_scores = []
-        max_scores = {'f1_score':{'value':0.000, 'C': None, 'gamma':None},
-                    'score':{'value':0.000, 'C': None, 'gamma':None},
-                    'log_loss':{'value':0.000, 'C': None, 'gamma':None}}
+        # #C_range = grid.best_params_['C']* np.linspace(0.95,1.05,19)#np.linspace(0.6,1.2,10)
+        # #gamma_range =  grid.best_params_['gamma']* np.linspace(0.95,1.05,19) #np.linspace(0.5,1.,10)
+        # #0.0001*np.linspace(0.6,1.1,11) #0.0001*np.linspace(0.8,1.2,11)
+        # all_scores = []
+        # max_scores = {'f1_score':{'value':0.000, 'C': None, 'gamma':None},
+        #             'score':{'value':0.000, 'C': None, 'gamma':None},
+        #             'log_loss':{'value':0.000, 'C': None, 'gamma':None}}
 
-        for C in C_range:
-            for gamma in gamma_range:
-                #print("C: {}, gamma: {}".format(C, gamma))
-                svc_params = {'kernel':'rbf', 'probability':True,
-                            'class_weight':'balanced','C':C,'gamma':gamma}
-                clf = SVC
-                scores = run_kfolds(X,y,clf,**svc_params)
-                scores['C'] = C
-                scores['gamma'] = gamma
-                all_scores.append(scores)
+        # for C in C_range:
+        #     for gamma in gamma_range:
+        #         #print("C: {}, gamma: {}".format(C, gamma))
+        #         svc_params = {'kernel':'rbf', 'probability':True,
+        #                     'class_weight':'balanced','decision_function_shape':'ovr',
+        #                     'C':C,'gamma':gamma}
+        #         clf = SVC
+        #         scores = run_kfolds(X,y,clf,**svc_params)
+        #         scores['C'] = C
+        #         scores['gamma'] = gamma
+        #         all_scores.append(scores)
 
-                for k in max_scores.keys():
-                    if scores[k] > max_scores[k]['value']:
-                        max_scores[k]['value'] = scores[k]
-                        max_scores[k]['C'] = C
-                        max_scores[k]['gamma'] = gamma
+        #         for k in max_scores.keys():
+        #             if scores[k] > max_scores[k]['value']:
+        #                 max_scores[k]['value'] = scores[k]
+        #                 max_scores[k]['C'] = C
+        #                 max_scores[k]['gamma'] = gamma
 
-        df_scores = pd.DataFrame(all_scores)  #pd.DataFrame(all_scores)
-        df_scores.reset_index()
-        #print(df_scores.columns)
-        #df_scores.set_index('clf', inplace=True)
-        df_scores_nocnf = df_scores.drop('cnf_matrix',axis=1)
-        #print(df_scores_nocnf)
-        df_scores_nocnf.to_csv("param_tuning_{}.csv".format(window), encoding='utf-8')
+        # df_scores = pd.DataFrame(all_scores)  #pd.DataFrame(all_scores)
+        # df_scores.reset_index()
+        # #print(df_scores.columns)
+        # #df_scores.set_index('clf', inplace=True)
+        # df_scores_nocnf = df_scores.drop('cnf_matrix',axis=1)
+        # #print(df_scores_nocnf)
+        # df_scores_nocnf.to_csv("param_tuning_{}.csv".format(window), encoding='utf-8')
 
-        print()
-        print("Max Scores :") # df_scores['f1_score'].idxmax()]
-        pprint.pprint(max_scores)
+        # print()
+        # print("Max Scores :") # df_scores['f1_score'].idxmax()]
+        # pprint.pprint(max_scores)
 
-        to_plot = ['C','gamma','score']
-        plt.xticks(rotation=45)
-        plt.yticks(rotation=0)
-        plt.title("F1 Score")
-        ax = sbn.heatmap(df_scores.pivot('C','gamma','f1_score'))
-        #ax.set_yticklabels(rotation=0)
-        ax.set_yticklabels(ax.get_yticklabels(), rotation = 0, fontsize = 8)
-        plt.show()
+        # to_plot = ['C','gamma','score']
+        # plt.xticks(rotation=45)
+        # plt.yticks(rotation=0)
+        # plt.title("F1 Score")
+        # ax = sbn.heatmap(df_scores.pivot('C','gamma','f1_score'),xticklabels=5, yticklabels=5)
+        # #ax.set_yticklabels(rotation=0)
+        # ax.set_yticklabels(ax.get_yticklabels(), rotation = 0, fontsize = 8)
+        # plt.show()
 
 
-        input()
-        plt.xticks(rotation=45)
-        plt.yticks(rotation=0)
-        plt.title("Score")
-        ax = sbn.heatmap(df_scores.pivot('C','gamma','score'))
-        ax.set_yticklabels(ax.get_yticklabels(), rotation = 0, fontsize = 8)
-        #plt.yticks(rotation=0) 
-        plt.show()
+        # input()
+        # plt.xticks(rotation=45)
+        # plt.yticks(rotation=0)
+        # plt.title("Score")
+        # ax = sbn.heatmap(df_scores.pivot('C','gamma','score'),xticklabels=5, yticklabels=5)
+        # ax.set_yticklabels(ax.get_yticklabels(), rotation = 0, fontsize = 8)
+        # #plt.yticks(rotation=0) 
+        # plt.show()
 
     if analysis == 5:
         # running a test on the test data

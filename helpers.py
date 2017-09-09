@@ -78,8 +78,7 @@ def preprocess_matches_for_season(seasons, compute_form = False,
                             column='home_advantage_goals')
 
     if compute_form:
-        matches = merge_matches_with_form(matches=matches,
-                        seasons=seasons,window=window,league_name=league_name)
+        matches = merge_matches_with_form(matches=matches, exclude_firstn=exclude_firstn,seasons=seasons,window=window,league_name=league_name)
     return matches
 
 def get_all_matches(league_name="England"):
@@ -447,7 +446,7 @@ def get_all_seasons_data(seasons,league_name="England"): #matches,tattr):
 
 
 
-def compute_point_based_home_advantage(matches,column='home_advantage'):
+def compute_point_based_home_advantage(matches,column_name='home_advantage'):
     unique_teams = matches['home_team_api_id'].unique()
     # get teams
     teams = get_all_teams()
@@ -458,7 +457,7 @@ def compute_point_based_home_advantage(matches,column='home_advantage'):
     matches['away_team_points'] = 3*(matches['home_team_goal'] < matches['away_team_goal']) + \
                 1*(matches['home_team_goal'] == matches['away_team_goal'])
 
-    matches[column] = None
+    matches[column_name] = None
     matches['home_points_cumsum'] = 0
     matches['away_points_cumsum'] = 0
     for team in unique_teams:
@@ -490,23 +489,23 @@ def compute_point_based_home_advantage(matches,column='home_advantage'):
                 #         ['home_points_cumsum','away_points_cumsum','home_advantage']].head(i+1))
                 #print()
                 if amax != 0:
-                    matches.loc[cumsumb.index[i],'advantage_home'] = hmax / (amax *1.)
+                    matches.loc[cumsumb.index[i],column_name] = hmax / (amax *1.)
                 else:
-                    matches.loc[cumsumb.index[i],'advantage_home'] = 0.0
+                    matches.loc[cumsumb.index[i],column_name] = 0.0
 
     matches.drop(['home_points_cumsum','away_points_cumsum', 'home_team_points',
                   'away_team_points'], axis=1,inplace=True)
     
-    matches['advantage_home'] = pd.to_numeric(matches['advantage_home'],errors='coerce')
+    matches[column_name] = pd.to_numeric(matches[column_name],errors='coerce')
     return matches
 
-def compute_goal_based_home_advantage(matches,column='home_advantage'):
+def compute_goal_based_home_advantage(matches,column_name='home_advantage'):
     unique_teams = matches['home_team_api_id'].unique()
     # get teams
     teams = get_all_teams()
     seasons = matches['season'].unique()
 
-    matches[column] = None
+    matches[column_name] = None
     matches['home_goals_cumsum'] = 0
     matches['away_goals_cumsum'] = 0
     for team in unique_teams:
@@ -538,11 +537,11 @@ def compute_goal_based_home_advantage(matches,column='home_advantage'):
                 if (num_home_games != 0) &  (num_away_games != 0):
                     home_mean = home_mean / (1. * num_home_games)
                     away_mean = away_mean / (1. * num_away_games)
-                    matches.loc[cumsumb.index[i],'advantage_home'] = home_mean - away_mean 
+                    matches.loc[cumsumb.index[i],column_name] = home_mean - away_mean 
 
     matches.drop(['home_goals_cumsum','away_goals_cumsum'], axis=1,inplace=True)
 
-    matches['advantage_home'] = pd.to_numeric(matches['advantage_home'],errors='coerce')
+    matches[column_name] = pd.to_numeric(matches[column_name],errors='coerce')
 
     return matches
 

@@ -1,0 +1,37 @@
+Importing data ... 
+Analysis 2:
+Seasons: ['2009/2010', '2010/2011', '2011/2012', '2013/2014', '2014/2015']
+Home team 47.053% wins, 28.16% losses, 24.79% draws
+Matches entropy: 1.525419
+
+
+                          ArgMax           ArgMin        Max       Min
+log_loss  DecisionTreeClassifier          SVC_rbf  19.793598  1.024115
+score         AdaBoostClassifier       SVC_linear   0.493827  0.408657
+f1_score      AdaBoostClassifier  DummyClassifier   0.448000  0.304114
+----------------------------------------------------------------------------------------------------
+
+Summary Results for all iterations:
+                      clf   entropy  f1_score   log_loss     score seasons
+0         DummyClassifier  1.525419  0.304114  18.191035  0.473316     all
+1              SVC_linear  1.525419  0.419763   1.027377  0.408657     all
+2                 SVC_rbf  1.525419  0.440957   1.024115  0.433975     all
+3         SVC_precomputed  1.525419  0.419763   1.027923  0.408657     all
+4  DecisionTreeClassifier  1.525419  0.428643  19.793598  0.426927     all
+5      AdaBoostClassifier  1.525419  0.448000   1.095250  0.493827     all
+6  RandomForestClassifier  1.525419  0.430440   3.168085  0.435147     all
+7           SGDClassifier  1.525419  0.442346   1.070285  0.449584     all
+8    KNeighborsClassifier  1.525419  0.416072   5.143114  0.425814     all
+9           SGDClassifier  1.525419  0.427714   1.048810  0.481865     all
+Confusion Matrices
+0    [[0.0, 0.0, 460.0], [0.0, 0.0, 517.0], [0.0, 0...
+1    [[154.0, 163.0, 143.0], [178.0, 237.0, 102.0],...
+2    [[130.0, 182.0, 148.0], [149.0, 250.0, 118.0],...
+3    [[154.0, 163.0, 143.0], [178.0, 237.0, 102.0],...
+4    [[141.0, 136.0, 183.0], [124.0, 197.0, 196.0],...
+5    [[39.0, 127.0, 294.0], [54.0, 198.0, 265.0], [...
+6    [[115.0, 125.0, 220.0], [123.0, 184.0, 210.0],...
+7    [[91.0, 147.0, 222.0], [120.0, 222.0, 175.0], ...
+8    [[100.0, 119.0, 241.0], [96.0, 177.0, 244.0], ...
+9    [[28.0, 121.0, 311.0], [34.0, 186.0, 297.0], [...
+Name: cnf_matrix, dtype: object

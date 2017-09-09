@@ -1,0 +1,44 @@
+Importing data ... 
+Analysis 3:
+1
+Window: 0
+Seasons: ['2009/2010', '2010/2011', '2011/2012', '2013/2014', '2014/2015', '2015/2016']
+Home team 46.096% wins, 28.55% losses, 25.35% draws
+Matches entropy: 1.533261
+
+
+                                          ArgMax                  ArgMin  \
+log_loss                  DecisionTreeClassifier                 SVC_rbf   
+score     OneVsRestClassifier_AdaBoostClassifier  DecisionTreeClassifier   
+f1_score  OneVsRestClassifier_AdaBoostClassifier         DummyClassifier   
+
+                Max       Min  
+log_loss  21.040769  1.028299  
+score      0.496396  0.390807  
+f1_score   0.448095  0.294187  
+----------------------------------------------------------------------------------------------------
+
+
+Summary Results for window 0
+                                      clf   entropy  f1_score   log_loss  \
+0                         DummyClassifier  1.533261  0.294187  18.510630   
+1                              SVC_linear  1.533261  0.424995   1.031355   
+2                                 SVC_rbf  1.533261  0.436507   1.028299   
+3                  DecisionTreeClassifier  1.533261  0.392338  21.040769   
+4  OneVsRestClassifier_AdaBoostClassifier  1.533261  0.448095   1.095604   
+5                  RandomForestClassifier  1.533261  0.418413   2.790249   
+6                           SGDClassifier  1.533261  0.444602   1.067662   
+7                    KNeighborsClassifier  1.533261  0.410120   5.764143   
+8       OneVsRestClassifier_SGDClassifier  1.533261  0.432752   1.048619   
+
+      score  seasons  
+0  0.464062        0  
+1  0.416904        0  
+2  0.430817        0  
+3  0.390807        0  
+4  0.496396        0  
+5  0.425921        0  
+6  0.454152        0  
+7  0.420873        0  
+8  0.478427        0  
+====================================================================================================
