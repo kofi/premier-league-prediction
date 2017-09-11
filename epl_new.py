@@ -703,7 +703,10 @@ def plot_match_hometeam_outcomes_by(matches,index_column='season',league_name='E
     plt.show()
     input()
 
+
+#
 # Run through the sequence of analyses
+#
 if __name__ == '__main__':
 
     analysis = 4
@@ -841,13 +844,15 @@ if __name__ == '__main__':
         all_entropies = []
         do_plots = False
         debug = True
-        compute_form = False
-        home_advantage = 'points' #'both' #'goals','points'
+        compute_form = True
+        #options are: 'both' #'goals','points', none
+        home_advantage = None 
         diff_features = False
-        exclude_firstn = False
+        exclude_firstn = True
         train_test_split = False
+        istrain = True
     
-        options = {'season_select':'all','compute_form':compute_form,'league_name':league_name, 'exclude_firstn':exclude_firstn,'diff_features':diff_features, 'home_advantage':home_advantage,'train_test_split':train_test_split}
+        options = {'season_select':'all','compute_form':compute_form,'league_name':league_name, 'exclude_firstn':exclude_firstn,'diff_features':diff_features, 'home_advantage':home_advantage,'train_test_split':train_test_split,'istrain':istrain}
 
         window_range = 1 
         if compute_form:
@@ -924,7 +929,7 @@ if __name__ == '__main__':
         options = {'season_select':'all', 'compute_form':compute_form,
                  'exclude_firstn':True, 'diff_features': False, 
                  'home_advantage':home_advantage,'window':window,
-                 'train_test_split':False,'istrain':False}
+                 'train_test_split':False,'istrain':True}
         
         output = matches_for_analysis(1,**options)
         #X, y = output['X'], output['y']
@@ -936,9 +941,7 @@ if __name__ == '__main__':
 
         # iterate over SVC grid
         C_range =  np.linspace(0.0001,3,40) 
-        gamma_range =  np.linspace(0.0001,3,40)#[:5] 
-        #np.linspace(0.0001,1,100) #[0, 1e-5, 1e-4,1e-3, .01, .1, .15, .2, .25, .5, .75, 1] # #np.linspace(1,7,15) #12)
-        #np.logspace(0.0001,5,100) # [0.01, 0.25, 0.5, .75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3,10,30,100] #np.linspace(0.001,0.03,15) # 3, 12)
+        gamma_range =  np.linspace(0.0001,3,40)
         param_grid = dict(gamma=gamma_range, C=C_range)
         cv = StratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=42)
         svc_params = {'kernel':'rbf', 'class_weight':'balanced',
@@ -950,34 +953,79 @@ if __name__ == '__main__':
         print("The best parameters are %s with a score of %0.6f"
             % (grid.best_params_, grid.best_score_))
         
-        train_scores = grid.cv_results_['mean_test_score'].reshape(len(gamma_range),len(C_range))
+        #print(grid.cv_results_['mean_test_score'].shape)
+        # train_scores = grid.cv_results_['mean_test_score'].reshape(
+        #                     len(gamma_range),len(C_range))
+        #print(train_scores.shape)
 
-        plt.figure(figsize=(8, 6))
-        plt.xticks(rotation=45)
-        plt.yticks(rotation=0)
-        #plt.subplots_adjust(left=.2, right=0.95, bottom=0.15, top=0.95)
-        #plt.imshow(train_scores, interpolation='nearest', cmap=plt.cm.hot)
-        plt.title('Grid Search for F1 Score')
-        #plt.xlabel('C')
-        #plt.ylabel('gamma')
+        # plt.figure(figsize=(8, 6))
+        # plt.xticks(rotation=45, fontsize=8)
+        # plt.yticks(rotation=90, fontsize=8)
+        # #plt.subplots_adjust(left=.2, right=0.95, bottom=0.15, top=0.95)
+        # #plt.imshow(train_scores, interpolation='nearest', cmap=plt.cm.hot)
+        # plt.title('Grid Search for F1 Score')
+        # #plt.xlabel('C')
+        # #plt.ylabel('gamma')
+        # plt.xticks(np.arange(len(C_range)), C_range)
+        # plt.yticks(np.arange(len(gamma_range)), gamma_range)
+        # ax = sbn.heatmap(train_scores, fmt=".4f") #,
+        # #    yticklabels=gamma_range, xticklabels=C_range)
+        # #ax.set_yticklabels(ax.get_yticklabels(), rotation = 0, fontsize = 8)
 
-        ax = sbn.heatmap(train_scores,  fmt=".4f")
-        ax.set_yticklabels(ax.get_yticklabels(), rotation = 0, fontsize = 8)
-        plt.yticks(np.arange(len(C_range)), C_range)
-        plt.xticks(np.arange(len(gamma_range)), gamma_range)
-        # loc = plticker.MultipleLocator(base=2*(max(gamma_range) - min(gamma_range))/(1. *len(gamma_range))) 
-        # ax.xaxis.set_major_locator(loc)
-        ax.xaxis.set_major_formatter(FormatStrFormatter('%.5f'))
-        # loc = plticker.MultipleLocator(base=5*(max(C_range) - min(C_range))/(1. *len(C_range)))
-        # ax.yaxis.set_major_locator(loc)
-        ax.yaxis.set_major_formatter(FormatStrFormatter('%.5f'))
-        #ax.set_xticks(ax.get_xticks()[::5])
-        #ax.set_yticks(ax.get_yticks()[::5])
-        ax.set(xlabel='gamma', ylabel='C')
-        plt.show()
+        # #plt.xticks(C_range)
+        # #plt.yticks(gamma_range)
+        # #ax.set_xticks()
+        # # loc = plticker.MultipleLocator(base=2*(max(gamma_range) - min(gamma_range))/(1. *len(gamma_range))) 
+        # # ax.xaxis.set_major_locator(loc)
+        # ax.xaxis.set_major_formatter(FormatStrFormatter('%.5f'))
+        # # loc = plticker.MultipleLocator(base=5*(max(C_range) - min(C_range))/(1. *len(C_range)))
+        # # ax.yaxis.set_major_locator(loc)
+        # ax.yaxis.set_major_formatter(FormatStrFormatter('%.5f'))
+        # #ax.set_yticks(gamma_range)
+        # #ax.set_xticks(C_range)
+        # ax.set_xticks(ax.get_xticks()[::2])
+        # ax.set_yticks(ax.get_yticks()[::2])
+        # ax.set(ylabel='gamma', xlabel='C')
+        # #plt.show()
+
+        # See https://stackoverflow.com/questions/12632992/gridsearch-for-an-estimator-inside-a-onevsrestclassifier
+        # tune the OneVsRest SGDC
+        n_iter = len(y_train)
+        print(n_iter)
+        sgdc_clf = SGDClassifier(loss='log', n_iter=n_iter) 
+        #,alpha=0.001,n_iter=100)
+        ovr_sgdc = OneVsRestClassifier(estimator=sgdc_clf)
+        alpha_range= 10.0**-np.arange(1,7) 
+        alpha_n_iter = [100,200,500,1000]        #[0.00001,0.0001,0.001,0.05, 0.01,0.02,0.05,0.1,1]
+        param_grid = {
+            "estimator__alpha": alpha_range,
+            "estimator__n_iter": alpha_n_iter
+        }
+        grid = GridSearchCV(ovr_sgdc, param_grid=param_grid, 
+                        cv=cv,scoring=f1_scorer)
+        grid.fit(X_train, y_train)
+
+        print("The best parameters for OneVsRest SGDC are %s with a score of %0.6f"
+            % (grid.best_params_, grid.best_score_))
 
 
-        #input() 
+
+        # Tune the Adaboot Classifier
+        ada = AdaBoostClassifier(base_estimator=None)
+        n_estimators_range = np.arange(1,51)
+        n_learning_rate_range = [0.00001,0.0001,0.001,0.05,
+                                0.01,0.02,0.05,0.1,1]
+        param_grid = {
+            "estimator__n_estimators":n_estimators_range, 
+            "estimator__learning_rate":n_learning_rate_range
+        }
+        ovr_ada = OneVsRestClassifier(estimator=ada)
+        grid = GridSearchCV(ovr_ada, param_grid=param_grid, 
+                        cv=cv,scoring=f1_scorer)
+        grid.fit(X_train, y_train)
+
+        print("The best parameters for OneVsRest Adaboost are %s with a score of %0.6f"
+            % (grid.best_params_, grid.best_score_))
 
         # #C_range = grid.best_params_['C']* np.linspace(0.95,1.05,19)#np.linspace(0.6,1.2,10)
         # #gamma_range =  grid.best_params_['gamma']* np.linspace(0.95,1.05,19) #np.linspace(0.5,1.,10)
