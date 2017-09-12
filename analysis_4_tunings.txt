@@ -1,0 +1,11 @@
+Importing data ... 
+Analysis 4: SVC Parameter tuning
+Seasons: ['2009/2010', '2010/2011', '2011/2012', '2013/2014', '2014/2015']
+Home team 49.900% wins, 28.54% losses, 21.56% draws
+Matches entropy: 1.493945
+
+
+The best parameters are {'gamma': 0.077020512820512824, 'C': 1.9231128205128205} with a score of 0.488312
+501
+The best parameters for OneVsRest SGDC are {'estimator__n_iter': 1000, 'estimator__alpha': 9.9999999999999995e-07} with a score of 0.463461
+The best parameters for OneVsRest Adaboost are {'estimator__learning_rate': 1, 'estimator__n_estimators': 4} with a score of 0.477603

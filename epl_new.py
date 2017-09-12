@@ -920,7 +920,7 @@ if __name__ == '__main__':
 
         
     if analysis == 4:
-        print("Analysis {}: SVC Parameter tuning".format(analysis))
+        print("Analysis {}:  Parameter tuning".format(analysis))
         do_plots = False
         debug = True
         compute_form = True
@@ -929,21 +929,24 @@ if __name__ == '__main__':
         options = {'season_select':'all', 'compute_form':compute_form,
                  'exclude_firstn':True, 'diff_features': False, 
                  'home_advantage':home_advantage,'window':window,
-                 'train_test_split':False,'istrain':True}
-        
+                 'train_test_split':True,'istrain':False}
+    
         output = matches_for_analysis(1,**options)
-        #X, y = output['X'], output['y']
         X_train, y_train = output['X'], output['y']
-        #X_test, y_test = output['X_test'], output['y_test']
+        X_test, y_test = output['X_test'], output['y_test']
+        print("Training size {}".format(X_train.shape))
+        print("Training size {}".format(X_test.shape))
 
         # f1 scorer
         f1_scorer = make_scorer(f1_score, average='weighted')
 
-        # iterate over SVC grid
-        C_range =  np.linspace(0.0001,3,40) 
-        gamma_range =  np.linspace(0.0001,3,40)
-        param_grid = dict(gamma=gamma_range, C=C_range)
+        # define cross-validation splits
         cv = StratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=42)
+
+        ## iterate over SVC grid
+        C_range =  np.linspace(0.001,3,40) 
+        gamma_range =  np.linspace(0.001,3,40)
+        param_grid = dict(gamma=gamma_range, C=C_range)
         svc_params = {'kernel':'rbf', 'class_weight':'balanced',
                     'decision_function_shape':'ovr', 'probability':True}
         grid = GridSearchCV(SVC(**svc_params), param_grid=param_grid, 
@@ -952,11 +955,11 @@ if __name__ == '__main__':
 
         print("The best parameters are %s with a score of %0.6f"
             % (grid.best_params_, grid.best_score_))
-        
-        #print(grid.cv_results_['mean_test_score'].shape)
+        print("RBF SVC Test score for best params {}".format(grid.score(X_test,y_test)))
+        # print(grid.cv_results_['mean_test_score'].shape)
         # train_scores = grid.cv_results_['mean_test_score'].reshape(
         #                     len(gamma_range),len(C_range))
-        #print(train_scores.shape)
+        # print(train_scores.shape)
 
         # plt.figure(figsize=(8, 6))
         # plt.xticks(rotation=45, fontsize=8)
@@ -989,32 +992,48 @@ if __name__ == '__main__':
         # #plt.show()
 
         # See https://stackoverflow.com/questions/12632992/gridsearch-for-an-estimator-inside-a-onevsrestclassifier
-        # tune the OneVsRest SGDC
-        n_iter = len(y_train)
-        print(n_iter)
-        sgdc_clf = SGDClassifier(loss='log', n_iter=n_iter) 
+        #tune the OneVsRest SGDC
+        sgdc_clf = SGDClassifier(loss='log',random_state=42) 
         #,alpha=0.001,n_iter=100)
         ovr_sgdc = OneVsRestClassifier(estimator=sgdc_clf)
         alpha_range= 10.0**-np.arange(1,7) 
-        alpha_n_iter = [100,200,500,1000]        #[0.00001,0.0001,0.001,0.05, 0.01,0.02,0.05,0.1,1]
+        n_iter_range =  np.arange(100,3100,100)
+        #[100,200,300,400,500,600,800,1000, 1200]        
+        #[0.00001,0.0001,0.001,0.05, 0.01,0.02,0.05,0.1,1]
         param_grid = {
             "estimator__alpha": alpha_range,
-            "estimator__n_iter": alpha_n_iter
+            "estimator__n_iter": n_iter_range
         }
         grid = GridSearchCV(ovr_sgdc, param_grid=param_grid, 
                         cv=cv,scoring=f1_scorer)
         grid.fit(X_train, y_train)
+        print("The best parameters for OneVsRest SGDC are %s with a score of %0.6f" % (grid.best_params_, grid.best_score_))
+        print("SGDC Test score for best params {}".format(grid.score(X_test,y_test)))
+        #clf = grid.best_estimator_
+        #print(clf.get_params())
+        #p =grid.best_params_
+        #print(p)
 
-        print("The best parameters for OneVsRest SGDC are %s with a score of %0.6f"
-            % (grid.best_params_, grid.best_score_))
+        # # sgdc_clf = SGDClassifier(loss='log',n_iter=2300,alpha=0.001, random_state =10) 
+        # sgdc_clf = SGDClassifier(loss='log',n_iter=1800,alpha=0.0001, random_state=42) 
+        # sgdc_clf = sgdc_clf.fit(X_train,y_train)
+        # train_score = f1_score(y_train, sgdc_clf.predict(X_train),average='weighted')
+        # test_score = f1_score(y_test, sgdc_clf.predict(X_test),average='weighted')
+        # print("Train {}, Test {}".format(train_score, test_score))
+        # The best parameters for OneVsRest SGDC are {'estimator__alpha': 1.0000000000000001e-05, 'estimator__n_iter': 600} with a score of 0.508111
+        # SGDC Test score for best params 0.4923312603118006
+        # The best parameters for OneVsRest Adaboost are {'estimator__learning_rate': 1, 'estimator__n_estimators': 10} with a score of 0.505163
 
 
 
-        # Tune the Adaboot Classifier
-        ada = AdaBoostClassifier(base_estimator=None)
+
+        # # Tune the Adaboot Classifier
+        ada = AdaBoostClassifier(random_state=42)
         n_estimators_range = np.arange(1,51)
+        #print(n_estimators_range)
         n_learning_rate_range = [0.00001,0.0001,0.001,0.05,
                                 0.01,0.02,0.05,0.1,1]
+        #print(n_learning_rate_range)
         param_grid = {
             "estimator__n_estimators":n_estimators_range, 
             "estimator__learning_rate":n_learning_rate_range
@@ -1023,9 +1042,8 @@ if __name__ == '__main__':
         grid = GridSearchCV(ovr_ada, param_grid=param_grid, 
                         cv=cv,scoring=f1_scorer)
         grid.fit(X_train, y_train)
-
-        print("The best parameters for OneVsRest Adaboost are %s with a score of %0.6f"
-            % (grid.best_params_, grid.best_score_))
+        print("The best parameters for OneVsRest Adaboost are %s with a score of %0.6f" % (grid.best_params_, grid.best_score_))
+        print("AdaBoost Test score for best params {}".format(grid.score(X_test,y_test)))
 
         # #C_range = grid.best_params_['C']* np.linspace(0.95,1.05,19)#np.linspace(0.6,1.2,10)
         # #gamma_range =  grid.best_params_['gamma']* np.linspace(0.95,1.05,19) #np.linspace(0.5,1.,10)
