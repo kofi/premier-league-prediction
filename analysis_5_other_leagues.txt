@@ -1,0 +1,18 @@
+Importing data ... 
+Analysis 5:  Other leagues
+Classifier |  Window |  Best Params |  Train Score  | Test Score
+Seasons: ['2009/2010', '2010/2011', '2011/2012', '2013/2014', '2014/2015', '2015/2016']
+Home team 46.167% wins, 28.83% losses, 25.00% draws
+Matches entropy: 1.532119
+
+
+SGDC for Spain has Training score: 0.59055698705163, Test score: 0.4830527686998653
+Adaboost for Spain has Training score: 0.5580934822358906, Test score: 0.5904193777237254
+Classifier |  Window |  Best Params |  Train Score  | Test Score
+Seasons: ['2009/2010', '2010/2011', '2011/2012', '2013/2014', '2014/2015', '2015/2016']
+Home team 45.352% wins, 30.70% losses, 23.94% draws
+Matches entropy: 1.534188
+
+
+SGDC for Germany has Training score: 0.6069273368121586, Test score: 0.4747692697768763
+Adaboost for Germany has Training score: 0.5766526687841128, Test score: 0.4857876272781725

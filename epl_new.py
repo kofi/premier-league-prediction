@@ -68,14 +68,11 @@ import matplotlib.ticker as plticker
 from matplotlib.ticker import FormatStrFormatter
 
 import warnings
-warnings.filterwarnings("ignore") #, category=DeprecationWarning)
+warnings.filterwarnings("ignore")
 
 # Input data files are available in the "../input/" directory.
 # For example, running this (by clicking run or pressing Shift+Enter)
 # will list the files in the input directory
-
-#from subprocess import check_output
-#print(check_output(["ls", "../input"]).decode("utf8"))
 
 # Any results you write to the current directory are saved as output.
 all_seasons=['2009/2010','2010/2011','2011/2012',
@@ -360,14 +357,10 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
 
     season = season_selectors.get(season_select,get_all_seasons)(nseasons,istrain)
     print("Seasons: {}".format(season))
-    # get_random_seasons(nseasons) #['2010/2011','2011/2012','2012/2013','2013/2014']
-    #matches = h.preprocess_matches_for_season(season)
     options = {'compute_form':compute_form, 'window':window,'exclude_firstn':exclude_firstn,
                 'home_advantage':home_advantage,'league_name':league_name}
 
     matches = h.preprocess_matches_for_season(season,**options)
-    #print(matches.columns.T)
-    #print(matches.describe())
     #print(matches.info())
     #print('print(matches.head().T)')
     #print(matches.head())
@@ -377,9 +370,6 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
     if filter_team:
         matches = matches[(matches['home_team_api_id'] == my_team_id)  |
                           (matches['away_team_api_id'] == my_team_id)]
-    # set the home status of the team of interest
-    #matches.loc[matches['home_team_api_id'] == my_team_id,'isteamhome'] = 1
-    #matches.loc[matches['home_team_api_id'] != my_team_id,'isteamhome'] = 0
 
     #print("Shape before cleanup and encode: {}".format(matches.shape))
 
@@ -422,11 +412,6 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
     #print("Shape of X after dropna: {}".format(matches.shape))
     #print(matches.columns.T)
     #print("Dataframe shape after dropping rows {}".format(matches.shape))
-
-    # # delete all away team information since we are
-    # # predicting only the home outcome
-    # away_cols = [x for x in matches.columns if 'away_' in x]
-    # matches.drop(away_cols,axis=1, inplace=True)
 
     # subsample data
     #matches = h.subsample_matches(matches)
@@ -476,7 +461,7 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
         if train_test_split:
             ss = StandardScaler().fit(test_matches_sub)
             X_test = np.array(ss.transform(test_matches_sub))  #np.array(StandardScaler().fit_transform(test_matches_sub))
-        #print("Shape of X after scaling: {}".format(X.shape))
+
     except Exception:
         print("excepted")
         matches = None
@@ -591,26 +576,21 @@ def plot_analysis_1(data):
         plt.show()
 
 # generate the ROC curves for a given clf and data
-def plot_roc_curves(X,y,clf,train_rows,kwargs=None):
+def plot_roc_curves(X,y,clf,train_rows,estimator='',league_name='EPL',kwargs=None):
     '''
         Multiclass ROC curve plotting
         See http://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html
     '''
     y = label_binarize(y, classes=output_class)
-    #print(np.append(y_train,y_test).shape)
     n_classes = y.shape[1]
-    #print(y.shape)
-    #print(n_classes)
+
 
     # Learn to predict each class against the other
-    # shuffle and split training and test sets
-    #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.4,random_state=0)
     X_train = X[:train_rows,:]
     X_test = X[train_rows:,:]
     y_train = y[:train_rows,:]
     y_test = y[train_rows:,:]
-    #print(y_train.shape)
-    #print(y_test.shape)
+
 
     classifier = OneVsRestClassifier(clf)
     try:
@@ -672,7 +652,7 @@ def plot_roc_curves(X,y,clf,train_rows,kwargs=None):
     plt.ylim([0.0, 1.05])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.title('Multiclass ROC for {} for EPL dataset'.format(clf.__class__.__name__))
+    plt.title('Multiclass ROC - {} {} for {} dataset'.format(clf.__class__.__name__,estimator, league_name))
     plt.legend(loc="lower right")
     plt.show()
 
@@ -709,7 +689,7 @@ def plot_match_hometeam_outcomes_by(matches,index_column='season',league_name='E
 #
 if __name__ == '__main__':
 
-    analysis = 4
+    analysis = 5
     league_name = "England"
 
     # run EDA analysis
@@ -737,9 +717,6 @@ if __name__ == '__main__':
                 'decision_function_shape':'ovr', 'probability':True}},
         {'clf': SVC, 'params':{'kernel':'rbf', 'class_weight':'balanced', 
             'decision_function_shape':'ovr', 'probability':True}},
-        # {'clf': SVC, 'params':{'kernel':'precomputed', 'class_weight':'balanced', 
-        #     'decision_function_shape':'ovr', 'probability':True}},
-        #{'clf': CalibratedClassifierCV, 'params':{'base_estimator':lscv}},
         {'clf': DecisionTreeClassifier, 'params':{'random_state':0}},
         #{'clf': GNB, 'params':{}},
         {'clf':OneVsRestClassifier, 'params':{'estimator': ada}},
@@ -749,7 +726,7 @@ if __name__ == '__main__':
         {'clf':kNN,'params':{'n_neighbors':5, 'weights':'distance'}},
         {'clf':OneVsRestClassifier, 
             'params':{'estimator': sgdc_clf}}]
-        #'params':{'loss':'log','alpha':0.001,'n_iter':100}}}]
+
     
     # Analysis 1:
     # use all data and get the basic scores
@@ -773,14 +750,13 @@ if __name__ == '__main__':
 
         for k in range(len(clfs)):
             c = clfs[k]
-            #print(c)
             clf_class = c['clf']
             kwargs = c['params']
             clf = clf_class(**kwargs)
             clfname = clf.__class__.__name__
-            if 'estimator' in kwargs: # 'OneVsRestClassifier':
+            if 'estimator' in kwargs: 
                 clfname = clfname + kwargs['estimator'].__class__.__name__
-            if 'base_estimator' in kwargs: # 'OneVsRestClassifier':
+            if 'base_estimator' in kwargs: 
                 clfname = clfname + kwargs['base_estimator'].__class__.__name__
             if 'kernel' in kwargs:
                 clfname = ("{}_{}".format(clfname,kwargs['kernel']))
@@ -922,20 +898,20 @@ if __name__ == '__main__':
     if analysis == 4:
         print("Analysis {}:  Parameter tuning".format(analysis))
         do_plots = False
-        debug = True
+        debug = False
         compute_form = True
         home_advantage = None
+
+        print("Classifier |  Window |  Best Params |  Train Score  | Test Score")
         window = 14
         options = {'season_select':'all', 'compute_form':compute_form,
-                 'exclude_firstn':True, 'diff_features': False, 
-                 'home_advantage':home_advantage,'window':window,
-                 'train_test_split':True,'istrain':False}
+                'exclude_firstn':True, 'diff_features': False, 
+                'home_advantage':home_advantage,'window':window,
+                'train_test_split':True,'istrain':False}
     
         output = matches_for_analysis(1,**options)
         X_train, y_train = output['X'], output['y']
-        X_test, y_test = output['X_test'], output['y_test']
-        print("Training size {}".format(X_train.shape))
-        print("Training size {}".format(X_test.shape))
+        X_test, y_test = output['X_test'], output['y_test'] 
 
         # f1 scorer
         f1_scorer = make_scorer(f1_score, average='weighted')
@@ -944,18 +920,20 @@ if __name__ == '__main__':
         cv = StratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=42)
 
         ## iterate over SVC grid
-        C_range =  np.linspace(0.001,3,40) 
-        gamma_range =  np.linspace(0.001,3,40)
+        C_range =  np.linspace(0.001,3,40) #np.logspace(-4, 8, 13) #np.linspace(0.001,3,40) #
+        gamma_range = np.linspace(0.001,3,40) # np.logspace(-9, 3, 13)# np.linspace(0.001,3,5) #
         param_grid = dict(gamma=gamma_range, C=C_range)
-        svc_params = {'kernel':'rbf', 'class_weight':'balanced',
-                    'decision_function_shape':'ovr', 'probability':True}
+        svc_params = {'kernel':'rbf', 'class_weight':'balanced', 'random_state':10, 'decision_function_shape':'ovr', 'probability':True}
         grid = GridSearchCV(SVC(**svc_params), param_grid=param_grid, 
                         cv=cv,scoring=f1_scorer)
         grid.fit(X_train, y_train)
 
-        print("The best parameters are %s with a score of %0.6f"
-            % (grid.best_params_, grid.best_score_))
-        print("RBF SVC Test score for best params {}".format(grid.score(X_test,y_test)))
+        print("SVC  |  %s  |  %s  |  %0.6f  |  %.6f"% (window, grid.best_params_, grid.best_score_, grid.score(X_test,y_test)))
+        # print("Best parameters for %s are %s with a score of %0.6f"
+        #     % (window, grid.best_params_, grid.best_score_))
+        # print("RBF SVC Test score for best params {}".format(grid.score(X_test,y_test)))
+
+
         # print(grid.cv_results_['mean_test_score'].shape)
         # train_scores = grid.cv_results_['mean_test_score'].reshape(
         #                     len(gamma_range),len(C_range))
@@ -991,8 +969,8 @@ if __name__ == '__main__':
         # ax.set(ylabel='gamma', xlabel='C')
         # #plt.show()
 
-        # See https://stackoverflow.com/questions/12632992/gridsearch-for-an-estimator-inside-a-onevsrestclassifier
-        #tune the OneVsRest SGDC
+        # # See https://stackoverflow.com/questions/12632992/gridsearch-for-an-estimator-inside-a-onevsrestclassifier
+        # #tune the OneVsRest SGDC
         sgdc_clf = SGDClassifier(loss='log',random_state=42) 
         #,alpha=0.001,n_iter=100)
         ovr_sgdc = OneVsRestClassifier(estimator=sgdc_clf)
@@ -1007,27 +985,26 @@ if __name__ == '__main__':
         grid = GridSearchCV(ovr_sgdc, param_grid=param_grid, 
                         cv=cv,scoring=f1_scorer)
         grid.fit(X_train, y_train)
-        print("The best parameters for OneVsRest SGDC are %s with a score of %0.6f" % (grid.best_params_, grid.best_score_))
-        print("SGDC Test score for best params {}".format(grid.score(X_test,y_test)))
-        #clf = grid.best_estimator_
-        #print(clf.get_params())
-        #p =grid.best_params_
-        #print(p)
+        print("1-vs-rest SGDC  |  %s  |  %s  |  %0.6f  |  %.6f"% (window, grid.best_params_, grid.best_score_, grid.score(X_test,y_test)))
+        # print("The best parameters for OneVsRest SGDC are %s with a score of %0.6f" % (grid.best_params_, grid.best_score_))
+        # print("SGDC Test score for best params {}".format(grid.score(X_test,y_test)))
+        # #clf = grid.best_estimator_
+        # #print(clf.get_params())
+        # #p =grid.best_params_
+        # #print(p)
 
-        # # sgdc_clf = SGDClassifier(loss='log',n_iter=2300,alpha=0.001, random_state =10) 
-        # sgdc_clf = SGDClassifier(loss='log',n_iter=1800,alpha=0.0001, random_state=42) 
-        # sgdc_clf = sgdc_clf.fit(X_train,y_train)
-        # train_score = f1_score(y_train, sgdc_clf.predict(X_train),average='weighted')
-        # test_score = f1_score(y_test, sgdc_clf.predict(X_test),average='weighted')
-        # print("Train {}, Test {}".format(train_score, test_score))
-        # The best parameters for OneVsRest SGDC are {'estimator__alpha': 1.0000000000000001e-05, 'estimator__n_iter': 600} with a score of 0.508111
-        # SGDC Test score for best params 0.4923312603118006
-        # The best parameters for OneVsRest Adaboost are {'estimator__learning_rate': 1, 'estimator__n_estimators': 10} with a score of 0.505163
+        # # # sgdc_clf = SGDClassifier(loss='log',n_iter=2300,alpha=0.001, random_state =10) 
+        # # sgdc_clf = SGDClassifier(loss='log',n_iter=1800,alpha=0.0001, random_state=42) 
+        # # sgdc_clf = sgdc_clf.fit(X_train,y_train)
+        # # train_score = f1_score(y_train, sgdc_clf.predict(X_train),average='weighted')
+        # # test_score = f1_score(y_test, sgdc_clf.predict(X_test),average='weighted')
+        # # print("Train {}, Test {}".format(train_score, test_score))
+        # # The best parameters for OneVsRest SGDC are {'estimator__alpha': 1.0000000000000001e-05, 'estimator__n_iter': 600} with a score of 0.508111
+        # # SGDC Test score for best params 0.4923312603118006
+        # # The best parameters for OneVsRest Adaboost are {'estimator__learning_rate': 1, 'estimator__n_estimators': 10} with a score of 0.505163
 
 
-
-
-        # # Tune the Adaboot Classifier
+        # # # Tune the Adaboot Classifier
         ada = AdaBoostClassifier(random_state=42)
         n_estimators_range = np.arange(1,51)
         #print(n_estimators_range)
@@ -1042,8 +1019,9 @@ if __name__ == '__main__':
         grid = GridSearchCV(ovr_ada, param_grid=param_grid, 
                         cv=cv,scoring=f1_scorer)
         grid.fit(X_train, y_train)
-        print("The best parameters for OneVsRest Adaboost are %s with a score of %0.6f" % (grid.best_params_, grid.best_score_))
-        print("AdaBoost Test score for best params {}".format(grid.score(X_test,y_test)))
+        print("1-vs-Rest Adaboost  |  %s  |  %s  |  %0.6f  |  %.6f"% (window, grid.best_params_, grid.best_score_, grid.score(X_test,y_test)))
+        # print("The best parameters for OneVsRest Adaboost are %s with a score of %0.6f" % (grid.best_params_, grid.best_score_))
+        # print("AdaBoost Test score for best params {}".format(grid.score(X_test,y_test)))
 
         # #C_range = grid.best_params_['C']* np.linspace(0.95,1.05,19)#np.linspace(0.6,1.2,10)
         # #gamma_range =  grid.best_params_['gamma']* np.linspace(0.95,1.05,19) #np.linspace(0.5,1.,10)
@@ -1103,166 +1081,48 @@ if __name__ == '__main__':
         # plt.show()
 
     if analysis == 5:
-        # running a test on the test data
-        print("Analysis {}:".format(analysis))
-
-        C =   569.04542855790191 #4862.8956398672553 # 569.04542855790191 #6221.488221346056 #1638.0284049793586
-        gamma = 0.0001 #0.00001 #0.0001# 6.3636363636363641e-05 #0.0001
-        svc_params = {'kernel':'rbf', 'class_weight':'balanced','probability':True,
-                        'decision_function_shape':'ovr','C':C,'gamma':gamma}
-        pprint.pprint("SVC params {}".format(svc_params))
+        print("Analysis {}:  Other leagues".format(analysis))
+        do_plots = False
+        debug = False
         compute_form = True
-        home_advantage = 'goals'
-        window = 14
-        options = {'season_select':'all', 'compute_form':compute_form,
+        home_advantage = None
+        league_names = ["England","Spain", "Germany"]
+
+        for league_name in league_names:
+
+            print("Classifier |  Window |  Best Params |  Train Score  | Test Score")
+            window = 14
+            options = {'season_select':'all', 'compute_form':compute_form,
                     'exclude_firstn':True, 'diff_features': False, 
-                    'home_advantage':home_advantage,'window':window,'istrain':False,
-                    'train_test_split':True}
-
-        print("Get training data")        
-        output = matches_for_analysis(1,**options)
-
-        X_train, y_train = output['X'], output['y']
-        X_test, y_test = output['X_test'], output['y_test']
-
-        # pca
-        # ndims = 12
-        # pca = PCA(n_components=ndims)
-        # pca = pca.fit(X_train)
-        # pca_results = h.pca_results(X_train, pca, output['data'].columns)
-        # components = pca_results[[c for c in pca_results.columns if c != 'Explained Variance']]
-        # components = components.T
-        # for d in components.columns:
-        #     print("Dimension: {}".format(d))
-        #     print(components[abs(components[d])>0.2].index)
-        #     print_spacer()
-
-        # print(pca.explained_variance_ratio_)
-
-        clf = SVC(**svc_params)
-        # then fit the training data fold
-        clf.fit(X_train,y_train)
-        # get the scores
-        local_score = get_scores(clf, X_test, y_test)
-        pprint.pprint(local_score)
-
-        train_size = X_train.shape[0]
-        plot_roc_curves(np.append(X_train,X_test,axis=0),
-                        np.append(y_train,y_test,axis=0),clf,train_size)
-
-        print("one vs all svc rbf")
-        clf = OneVsRestClassifier(SVC(**svc_params))
-        clf.fit(X_train, y_train)
-        local_score = get_scores(clf, X_test, y_test)
-        pprint.pprint(local_score)
-
-        print("one vs all sgd")
-        clf = OneVsRestClassifier(SGDClassifier(**{'loss':'log','alpha':0.001,'n_iter':100}))
-        clf.fit(X_train, y_train)
-        local_score = get_scores(clf, X_test, y_test)
-        pprint.pprint(local_score)
-
-# get the confusion matrix and plot for the RBF
+                    'home_advantage':home_advantage,'window':window,
+                    'train_test_split':True,'istrain':False, 'league_name': league_name}
+        
+            output = matches_for_analysis(1,**options)
+            X_train, y_train = output['X'], output['y']
+            X_test, y_test = output['X_test'], output['y_test']
 
 
+            # using the SGDC classifier for different leagues
+            sgdc_clf = SGDClassifier(loss='log',n_iter=1800,alpha=0.0001, random_state=42) 
+            ovr_sgdc = OneVsRestClassifier(estimator=sgdc_clf)
+            ovr_sgdc = ovr_sgdc.fit(X_train,y_train)
+            train_score = f1_score(y_train, ovr_sgdc.predict(X_train),average='weighted')
+            test_score = f1_score(y_test, ovr_sgdc.predict(X_test),average='weighted')      
+            print("SGDC for {} has Training score: {}, Test score: {}".format(league_name, train_score, test_score))
+            
+            ada = AdaBoostClassifier(random_state=42, n_estimators=10, learning_rate=1)  
+            ovr_ada = OneVsRestClassifier(estimator=ada)
+            ovr_ada = ovr_ada.fit(X_train,y_train)
+            train_score = f1_score(y_train, ovr_ada.predict(X_train),average='weighted')
+            test_score = f1_score(y_test, ovr_ada.predict(X_test),average='weighted')   
+            print("Adaboost for {} has Training score: {}, Test score: {}".format(league_name, train_score, test_score))
 
-exit()
+            train_size = X_train.shape[0]
+            plot_roc_curves(np.append(X_train,X_test,axis=0),
+                np.append(y_train,y_test,axis=0),ovr_ada,train_size, estimator='Adaboost',league_name=league_name)
 
-
-# # get the confusion matrix and plot for the RBF
-# #cnf_matrix = confusion_matrix(y_test, y_test_pred) #, labels=output_class)
-# #print(np.sum(np.sum(cnf_matrix)))
-
-
-# #print("Verification of Confusion matrix")
-# #for i in output_class:
-# #    for j in output_class:
-# #        matrix_val = np.dot((y_test==i)*1.,(y_test_pred == j)*1)
-# #        print("{} but predicts {}:  {}".format(i,j,matrix_val))
-
-# #print()
-# #print(cnf_matrix)
-# #print()
-
-
-# #### Problem seems to be the model is overpredicting one classifier.
-# #### Could be a problem due to the unbalanced data set
-# #### need to come up with an approach to oversample the smaller categories
-# #### and undersample the most frequent class
-
-# print('### Subsampling Data ####')
-# draws = matches[matches['home_team_outcome'] == 'draw']
-# wins = matches[matches['home_team_outcome'] == 'win']
-# losses = matches[matches['home_team_outcome'] == 'lose']
-# print("Losses:{}, draws:{}, wins:{}".format(len(losses), len(draws), len(wins)))
-
-# # subsample losses
-# are_draws_small = True if len(draws) < len(losses) else False
-
-# if are_draws_small:
-#     percentage = len(draws)/float(len(losses))
-#     losses_sampled =  losses.sample(frac = percentage, random_state = 2)
-#     percentage = len(draws)/float(len(wins))
-#     wins_sampled = wins.sample(frac = percentage, random_state = 2)
-#     matches_sampled = draws.append(wins_sampled)
-#     matches_sampled = matches_sampled.append(losses_sampled)
-
-#     # print stats
-#     print("Percentage losses	:", len(losses_sampled)/float(len(matches_sampled)))
-#     print("Percentage draws		:", len(draws)/float(len(matches_sampled)))
-# else:
-#     percentage = len(losses)/float(len(draws))
-#     draws_sampled =  draws.sample(frac = percentage, random_state = 2)
-#     percentage = len(losses)/float(len(wins))
-#     wins_sampled = wins.sample(frac = percentage, random_state = 2)
-#     matches_sampled = losses.append(wins_sampled)
-#     matches_sampled = matches_sampled.append(draws_sampled)
-
-#     #print stats
-#     print("Percentage draws	:", len(draws_sampled)/float(len(matches_sampled)))
-#     print("Percentage losses		:", len(losses)/float(len(matches_sampled)))
-# #matches_sampled = draws.append(wins_sampled)
-# #matches_sampled = matches_sampled.append(losses_sampled)
-
-# print("Percentage wins		:", len(wins_sampled)/float(len(matches_sampled)))
-# print("Total matches		:", len(matches_sampled))
+            print_conf_matrix(y_test,ovr_ada.predict(X_test))
 
 
-# # define the output variable
-# y = np.array(matches_sampled['home_team_outcome'])
-
-# print("Unique Y ", matches_sampled['home_team_outcome'].unique())
-
-# # then delete columns
-# matches_hm_goals = matches_sampled.drop(['home_team_points','home_team_goal',
-#                                     'away_team_goal','home_team_outcome'], axis=1)
-# # finally transform the data and scale to normalize
-# X = np.array(scaler.fit_transform(matches_hm_goals))
-# print("shape of X: {}".format(X.shape))
-# X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.25, random_state=14)
-
-# ## lets try with PCA
-# pca = PCA(n_components=28)
-# pca = pca.fit(X)
-# #X = pca.transform(X)
-
-# #print("Percent explain variance")
-# #print(100*pca.explained_variance_ratio_)
-
-
-
-
-
-# # In[12]:
-
-# from sklearn.metrics import roc_curve, auc
-# from sklearn.metrics import accuracy_score
-# # Compute ROC curve and ROC area for each class
-# fpr = dict()
-# tpr = dict()
-# roc_auc = dict()
-# for i in range(3):
-#     fpr[i], tpr[i], _ = roc_curve(y_test[:, i], y_score[:, i])
-#     roc_auc[i] = auc(fpr[i], tpr[i])
 
 
