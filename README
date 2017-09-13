@@ -40,12 +40,14 @@
 - Command line arguments and corresponding functionality:
     + 1:
         * Generates training and test scores for each classifier
+        * Output use for Tables 1 & 2 in the project report
         * Does not use cross-validation 
         * Uses only features in existing dataset
         * It loops over all classifiers, fits a model and uses it to compute training and test scores for selected metrics
     + 2:
         * Analysis 2:
         * Uses training data to get the performance scores using k-folds cross-validation with a k=5
+        * Output use for Table 3 in the project report
         * This uses the preprocessed data with only existing features
         * it loops over all classifiers and reports back the cross-validation scores for a number of metrics
     
