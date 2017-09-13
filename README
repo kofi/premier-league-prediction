@@ -1,0 +1,75 @@
+# Scripts:
+- scripts/epl_new.py: 
+    The main script that implements the learning classifiers, runs the parameter tunings and performance metrics.
+
+- scripts/helpers.py:
+    A set of helper functions for importing data from the source dataset/database, handling data cleanup and encoding, and adding additional features based on the desired analysis
+- scripts/process_538_predictions.py:
+    a script that uses data in FiveThirtyEight2016-17predictions.xlsx to get performance metrics for the FiveThirtyEight benchmark
+- scripts/process_lawro_predicts.py
+    + a script that generates performance metrics for Mark lawrenson predictions for the 2015/16 EPL season. This is another benchmark
+
+
+# Inputs
+- input/database.sqlite:
+    + This is the source dataset obtained https://www.kaggle.com/hugomathien/soccer. It is a large sqlite database which can be downloaded as a zip and uncompressed. It has to be placed in a folder named 'input' outside the scripts folder
+    + processing of this file is performed in the helpers.py script
+- FiveThirtyEight2016-17predictions.xlsx:
+    + contains the FiveThirtyEight 2016/17 EPL season predictions
+    + this is used as a benchmark
+    + run the process_538_predictions.py script to process this and generate F1 scores and confusion matrix
+    + scraped from https://projects.fivethirtyeight.com/soccer-predictions/premier-league/
+- Lawro2015-16predictions.xlsx:
+    + contains the predictions from BBC pundit Mark lawrenson
+    + this is used as a benchmark
+    + run the process_lawro_predicts.py scrip to process and generate both F1 scores and a confusion matrix
+    + data is scraped from link below and then processed externally in excel
+    + http://www.myfootballfacts.com/Mark_Lawrenson_Predictions_2015-16.html
+
+# How to:
+- the code was tested using an Anaconda environment with Python 3.4.5
+- it uses Sklearn, pandas, matplotlib and numpy
+- Running the code:
+    + run the scripts/epl_new.py an integer command line argument
+        * example epl_new.py 1
+    + the script takes a single integer argument. integers can range from 1 to 5
+    + Each integer runs a section of code (analysis) with descriptions below
+    + during processing the script may generate additional output files launch matplotlib figures
+    - each section can be run out of sequence
+
+- Command line arguments and corresponding functionality:
+    + 1:
+        * Generates training and test scores for each classifier
+        * Does not use cross-validation 
+        * Uses only features in existing dataset
+        * It loops over all classifiers, fits a model and uses it to compute training and test scores for selected metrics
+    + 2:
+        * Analysis 2:
+        * Uses training data to get the performance scores using k-folds cross-validation with a k=5
+        * This uses the preprocessed data with only existing features
+        * it loops over all classifiers and reports back the cross-validation scores for a number of metrics
+    
+    + 3:
+        * Explores the impact of the additional features:
+        *   1. The team form features
+        *      This loops over multiple windows and computes scores for each classifier 
+        *      Change variable in this section of code to: 
+        *            - compute_form = True,  
+        *            - exclude_firstn = True, 
+        *            - home_advantage = None, 
+        *   2. The home team advantage features
+        *      This resets the team form window to 0 and adds a set of new features to capture the home advantage. 
+        *      There are two ways to compute the home form: goals or points
+        *      Change variable in this section of code to:
+        *           - compute_form = False,  
+        *           - exclude_firstn = False, 
+        *           - home_advantage = 'points' or 'goals' ,
+    + 4:
+        * This section does the parameter tuning for a subset of algorithms
+        * Assumes a fixed home form window based on the results of analysis 3
+    + 5
+        * This section computes the test results for the Adaboost and SGDC classifiers
+        * It also generates the ROC curves and confusion matrices    
+    
+
+

@@ -518,9 +518,6 @@ def analysis_1(i, clfs, matches_data,pipeline_pca=False,debug=False):
         #print("Percent explain variance")
         #print(100*pca.explained_variance_ratio_)
 
-    # ... get the training score
-    #clfs = [{'clf': SVC, 'params':{'kernel':'rbf', 'probability':True}}]
-
     all_scores = []
     for k in clfs:
         scores = run_kfolds(X,y,k['clf'], **k['params'])
@@ -528,13 +525,9 @@ def analysis_1(i, clfs, matches_data,pipeline_pca=False,debug=False):
         scores['seasons'] = i
         all_scores.append(scores)
         clf = k['clf'](**k['params'])
-        #print(clf.__class__.__name__ + ' ' + k['params'].get('kernel',''))
-        #if clf.__class__.__name__ in ["SVC","DecisionTreeClassifier"]:
+
         if debug:
             cnf_matrix = scores['cnf_matrix']
-            #print(cnf_matrix)
-            #plot_conf_matrix(cnf_matrix)
-            #print(classification_report(y, y_pred,digits=5))
 
     df_scores = pd.DataFrame(all_scores)
     df_scores.set_index('clf', inplace=True)
@@ -684,20 +677,41 @@ def plot_match_hometeam_outcomes_by(matches,index_column='season',league_name='E
     input()
 
 
-#
-# Run through the sequence of analyses
-#
-if __name__ == '__main__':
 
-    analysis = 5
-    league_name = "England"
 
-    # run EDA analysis
-    if analysis == 0:
-        perform_eda_for_matches_1()
-        perform_eda_for_matches_2()
+
+
+
+
+
+
+
+# 
+# The main routine for selecting which analysis and outputs to generate
+# 
+def main(argv):
+    if len(argv) < 1:
+        print("Please provide an integer ranging from 2 - 5")
         exit()
 
+    analysis = argv[0]
+    try:
+        analysis = int(analysis)
+    except:
+        exit()
+    league_name = "England"
+
+    if analysis < 1 or analysis > 5:
+        print("Oops. Cannot access random dreams. Select 1 - 5")
+        exit()
+    print("Selected analysis: {}".format(analysis))
+
+
+    # # run EDA analysis
+    # if analysis == 0:
+    #     perform_eda_for_matches_1()
+    #     perform_eda_for_matches_2()
+    #     exit()
     print("Importing data ... ")
     h.import_datasets(league_name)
     #setup a few data structures to store results
@@ -718,19 +732,18 @@ if __name__ == '__main__':
         {'clf': SVC, 'params':{'kernel':'rbf', 'class_weight':'balanced', 
             'decision_function_shape':'ovr', 'probability':True}},
         {'clf': DecisionTreeClassifier, 'params':{'random_state':0}},
-        #{'clf': GNB, 'params':{}},
         {'clf':OneVsRestClassifier, 'params':{'estimator': ada}},
         {'clf': RandomForestClassifier, 'params':{}},
         {'clf': SGDClassifier,
-            'params':{'loss':'log','class_weight':'balanced','penalty':'l2','n_iter':1000}}, #,'alpha':0.001,'n_iter':100}},
+            'params':{'loss':'log','class_weight':'balanced','penalty':'l2','n_iter':1000}}, 
         {'clf':kNN,'params':{'n_neighbors':5, 'weights':'distance'}},
         {'clf':OneVsRestClassifier, 
             'params':{'estimator': sgdc_clf}}]
 
-    
     # Analysis 1:
-    # use all data and get the basic scores
-    #
+    # Generate training and test scores for each classifier
+    # Does not use cross-validation and uses only features in existing dataset
+    # It loops over all classifiers, fits a model and uses it to compute training and test scores for selected metrics
     if analysis == 1:
         print("Analysis {}:".format(analysis))
         home_advantage = 'both'
@@ -786,21 +799,17 @@ if __name__ == '__main__':
             print_spacer()
 
     # Analysis 2:
-    # use all data and get the basic scores using cross-validation since the dataset is not that large
-    #
+    # use all data and get the performance scores using K-folds cross-validation using k = 5
+    # This uses the preprocessed data with only existing features
+    # it loops over all classifiers and reports back the cross-validation scores for a number of metrics
     if analysis == 2:
         # plot the performance of each of the algorithms for default data
         # no windows, no calculation of forms
-        # no diffs, no PCA 
         print("Analysis {}:".format(analysis))
         options = {'season_select':'all','compute_form':compute_form,
                  'league_name':league_name, 'window':0,'exclude_firstn':False, 'diff_features':False,'home_advantage':'both', 'istrain':True, 'train_test_split':False}
         all_runs = []
         output = matches_for_analysis(1,**options)
-        # plot the win-draw-loss ratios by season
-        #plot_match_hometeam_outcomes_by(output['rawdata'],index_column='season',league_name=league_name)
-        # plot the win-draw-loss ratios by stage in season
-        #plot_match_hometeam_outcomes_by(output['rawdata'],index_column='stage',league_name=league_name)
         
         df_scores = analysis_1('all', clfs, output, pipeline_pca=False,debug=True)
         all_runs.append(df_scores.reset_index())
@@ -813,7 +822,13 @@ if __name__ == '__main__':
 
     # Explore the impact of the additional features:
     # 1. The team form features
+    #      This loops over multiple windows and computes scores for each classifier 
+    #      set: compute_form = True,  exclude_firstn = True, home_advantage = None, train_test_split = False, isTrain = True
     # 2. The home team advantage features
+    #      This resets the window to 0 and adds a set of home form features
+    #       There are two ways to compute the home form: goals or points
+    #      set: compute_form = False,  exclude_firstn = False, home_advantage = 'points' or 'goals' , train_test_split = False, isTrain = True  
+    #
     if analysis == 3:
         print("Analysis {}:".format(analysis))
         all_runs = []
@@ -872,29 +887,19 @@ if __name__ == '__main__':
             mcount = 0
             plt.figure()
             for c in dfa_windows['clf'].unique():
-                dfa_subset = dfa_windows.loc[dfa_windows['clf'].str.contains(c)] #dfa
+                dfa_subset = dfa_windows.loc[dfa_windows['clf'].str.contains(c)]
                 dfa_subset = dfa_subset[['window',sc]]
                 ax = plt.plot(dfa_subset['window'],dfa_subset[[sc]],label=c,
                     linestyle='-', color=clcolor[mcount], marker=markers[mcount])
                 mcount = mcount+1
 
-            # use only integer labels for x-axis
-            #for axis in [ax.xaxis]:
-            #ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-            # Shrink current axis's height by 10% on the bottom
-            #box = ax.get_position()
-            # ax.set_position([box.x0, box.y0 + box.height * 0.1,
-            #                 box.width, box.height * 0.9])
-            # Put a legend below current axis
             plt.legend(dfa_windows['clf'].unique())
-            #,loc='upper center', bbox_to_anchor=(0.5, -0.05),fancybox=True, shadow=True, ncol=4)
-            #plt.legend(dfa_windows['clf'].unique(), ncol=2, loc='upper left')
             plt.title("{} variation".format(sc))
             plt.savefig('{}_variation_with_window.png'.format(sc),format='png')
-            #plt.show()
             dfa_windows.drop('cnf_matrix',axis=1).to_csv("{}_var_with_window.csv".format(sc), encoding='utf-8')
 
-        
+    # This section does the parameter tuning for a subset of algorithms
+    # assumes a fixed window based on analysis 3    
     if analysis == 4:
         print("Analysis {}:  Parameter tuning".format(analysis))
         do_plots = False
@@ -929,55 +934,14 @@ if __name__ == '__main__':
         grid.fit(X_train, y_train)
 
         print("SVC  |  %s  |  %s  |  %0.6f  |  %.6f"% (window, grid.best_params_, grid.best_score_, grid.score(X_test,y_test)))
-        # print("Best parameters for %s are %s with a score of %0.6f"
-        #     % (window, grid.best_params_, grid.best_score_))
-        # print("RBF SVC Test score for best params {}".format(grid.score(X_test,y_test)))
-
-
-        # print(grid.cv_results_['mean_test_score'].shape)
-        # train_scores = grid.cv_results_['mean_test_score'].reshape(
-        #                     len(gamma_range),len(C_range))
-        # print(train_scores.shape)
-
-        # plt.figure(figsize=(8, 6))
-        # plt.xticks(rotation=45, fontsize=8)
-        # plt.yticks(rotation=90, fontsize=8)
-        # #plt.subplots_adjust(left=.2, right=0.95, bottom=0.15, top=0.95)
-        # #plt.imshow(train_scores, interpolation='nearest', cmap=plt.cm.hot)
-        # plt.title('Grid Search for F1 Score')
-        # #plt.xlabel('C')
-        # #plt.ylabel('gamma')
-        # plt.xticks(np.arange(len(C_range)), C_range)
-        # plt.yticks(np.arange(len(gamma_range)), gamma_range)
-        # ax = sbn.heatmap(train_scores, fmt=".4f") #,
-        # #    yticklabels=gamma_range, xticklabels=C_range)
-        # #ax.set_yticklabels(ax.get_yticklabels(), rotation = 0, fontsize = 8)
-
-        # #plt.xticks(C_range)
-        # #plt.yticks(gamma_range)
-        # #ax.set_xticks()
-        # # loc = plticker.MultipleLocator(base=2*(max(gamma_range) - min(gamma_range))/(1. *len(gamma_range))) 
-        # # ax.xaxis.set_major_locator(loc)
-        # ax.xaxis.set_major_formatter(FormatStrFormatter('%.5f'))
-        # # loc = plticker.MultipleLocator(base=5*(max(C_range) - min(C_range))/(1. *len(C_range)))
-        # # ax.yaxis.set_major_locator(loc)
-        # ax.yaxis.set_major_formatter(FormatStrFormatter('%.5f'))
-        # #ax.set_yticks(gamma_range)
-        # #ax.set_xticks(C_range)
-        # ax.set_xticks(ax.get_xticks()[::2])
-        # ax.set_yticks(ax.get_yticks()[::2])
-        # ax.set(ylabel='gamma', xlabel='C')
-        # #plt.show()
 
         # # See https://stackoverflow.com/questions/12632992/gridsearch-for-an-estimator-inside-a-onevsrestclassifier
         # #tune the OneVsRest SGDC
         sgdc_clf = SGDClassifier(loss='log',random_state=42) 
-        #,alpha=0.001,n_iter=100)
         ovr_sgdc = OneVsRestClassifier(estimator=sgdc_clf)
         alpha_range= 10.0**-np.arange(1,7) 
         n_iter_range =  np.arange(100,3100,100)
-        #[100,200,300,400,500,600,800,1000, 1200]        
-        #[0.00001,0.0001,0.001,0.05, 0.01,0.02,0.05,0.1,1]
+
         param_grid = {
             "estimator__alpha": alpha_range,
             "estimator__n_iter": n_iter_range
@@ -986,23 +950,6 @@ if __name__ == '__main__':
                         cv=cv,scoring=f1_scorer)
         grid.fit(X_train, y_train)
         print("1-vs-rest SGDC  |  %s  |  %s  |  %0.6f  |  %.6f"% (window, grid.best_params_, grid.best_score_, grid.score(X_test,y_test)))
-        # print("The best parameters for OneVsRest SGDC are %s with a score of %0.6f" % (grid.best_params_, grid.best_score_))
-        # print("SGDC Test score for best params {}".format(grid.score(X_test,y_test)))
-        # #clf = grid.best_estimator_
-        # #print(clf.get_params())
-        # #p =grid.best_params_
-        # #print(p)
-
-        # # # sgdc_clf = SGDClassifier(loss='log',n_iter=2300,alpha=0.001, random_state =10) 
-        # # sgdc_clf = SGDClassifier(loss='log',n_iter=1800,alpha=0.0001, random_state=42) 
-        # # sgdc_clf = sgdc_clf.fit(X_train,y_train)
-        # # train_score = f1_score(y_train, sgdc_clf.predict(X_train),average='weighted')
-        # # test_score = f1_score(y_test, sgdc_clf.predict(X_test),average='weighted')
-        # # print("Train {}, Test {}".format(train_score, test_score))
-        # # The best parameters for OneVsRest SGDC are {'estimator__alpha': 1.0000000000000001e-05, 'estimator__n_iter': 600} with a score of 0.508111
-        # # SGDC Test score for best params 0.4923312603118006
-        # # The best parameters for OneVsRest Adaboost are {'estimator__learning_rate': 1, 'estimator__n_estimators': 10} with a score of 0.505163
-
 
         # # # Tune the Adaboot Classifier
         ada = AdaBoostClassifier(random_state=42)
@@ -1020,66 +967,9 @@ if __name__ == '__main__':
                         cv=cv,scoring=f1_scorer)
         grid.fit(X_train, y_train)
         print("1-vs-Rest Adaboost  |  %s  |  %s  |  %0.6f  |  %.6f"% (window, grid.best_params_, grid.best_score_, grid.score(X_test,y_test)))
-        # print("The best parameters for OneVsRest Adaboost are %s with a score of %0.6f" % (grid.best_params_, grid.best_score_))
-        # print("AdaBoost Test score for best params {}".format(grid.score(X_test,y_test)))
-
-        # #C_range = grid.best_params_['C']* np.linspace(0.95,1.05,19)#np.linspace(0.6,1.2,10)
-        # #gamma_range =  grid.best_params_['gamma']* np.linspace(0.95,1.05,19) #np.linspace(0.5,1.,10)
-        # #0.0001*np.linspace(0.6,1.1,11) #0.0001*np.linspace(0.8,1.2,11)
-        # all_scores = []
-        # max_scores = {'f1_score':{'value':0.000, 'C': None, 'gamma':None},
-        #             'score':{'value':0.000, 'C': None, 'gamma':None},
-        #             'log_loss':{'value':0.000, 'C': None, 'gamma':None}}
-
-        # for C in C_range:
-        #     for gamma in gamma_range:
-        #         #print("C: {}, gamma: {}".format(C, gamma))
-        #         svc_params = {'kernel':'rbf', 'probability':True,
-        #                     'class_weight':'balanced','decision_function_shape':'ovr',
-        #                     'C':C,'gamma':gamma}
-        #         clf = SVC
-        #         scores = run_kfolds(X,y,clf,**svc_params)
-        #         scores['C'] = C
-        #         scores['gamma'] = gamma
-        #         all_scores.append(scores)
-
-        #         for k in max_scores.keys():
-        #             if scores[k] > max_scores[k]['value']:
-        #                 max_scores[k]['value'] = scores[k]
-        #                 max_scores[k]['C'] = C
-        #                 max_scores[k]['gamma'] = gamma
-
-        # df_scores = pd.DataFrame(all_scores)  #pd.DataFrame(all_scores)
-        # df_scores.reset_index()
-        # #print(df_scores.columns)
-        # #df_scores.set_index('clf', inplace=True)
-        # df_scores_nocnf = df_scores.drop('cnf_matrix',axis=1)
-        # #print(df_scores_nocnf)
-        # df_scores_nocnf.to_csv("param_tuning_{}.csv".format(window), encoding='utf-8')
-
-        # print()
-        # print("Max Scores :") # df_scores['f1_score'].idxmax()]
-        # pprint.pprint(max_scores)
-
-        # to_plot = ['C','gamma','score']
-        # plt.xticks(rotation=45)
-        # plt.yticks(rotation=0)
-        # plt.title("F1 Score")
-        # ax = sbn.heatmap(df_scores.pivot('C','gamma','f1_score'),xticklabels=5, yticklabels=5)
-        # #ax.set_yticklabels(rotation=0)
-        # ax.set_yticklabels(ax.get_yticklabels(), rotation = 0, fontsize = 8)
-        # plt.show()
-
-
-        # input()
-        # plt.xticks(rotation=45)
-        # plt.yticks(rotation=0)
-        # plt.title("Score")
-        # ax = sbn.heatmap(df_scores.pivot('C','gamma','score'),xticklabels=5, yticklabels=5)
-        # ax.set_yticklabels(ax.get_yticklabels(), rotation = 0, fontsize = 8)
-        # #plt.yticks(rotation=0) 
-        # plt.show()
-
+    
+    # This section computes the test results for the Adaboost and SGDC classifiers
+    # It also generates the ROC curves and confusion matrices   
     if analysis == 5:
         print("Analysis {}:  Other leagues".format(analysis))
         do_plots = False
@@ -1120,9 +1010,20 @@ if __name__ == '__main__':
             train_size = X_train.shape[0]
             plot_roc_curves(np.append(X_train,X_test,axis=0),
                 np.append(y_train,y_test,axis=0),ovr_ada,train_size, estimator='Adaboost',league_name=league_name)
-
+            print()
+            print("Adaboost Confusion Matrix")
             print_conf_matrix(y_test,ovr_ada.predict(X_test))
 
 
 
 
+
+
+#
+# Run through the sequence of analyses
+#
+if __name__ == '__main__':
+
+    main(sys.argv[1:])
+
+    
