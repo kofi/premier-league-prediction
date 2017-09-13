@@ -357,8 +357,7 @@ def matches_for_analysis(nseasons, season_select='firstn',filter_team=None,
 
     season = season_selectors.get(season_select,get_all_seasons)(nseasons,istrain)
     print("Seasons: {}".format(season))
-    options = {'compute_form':compute_form, 'window':window,'exclude_firstn':exclude_firstn,
-                'home_advantage':home_advantage,'league_name':league_name}
+    options = {'compute_form':compute_form, 'window':window,'exclude_firstn':exclude_firstn,'home_advantage':home_advantage,'league_name':league_name}
 
     matches = h.preprocess_matches_for_season(season,**options)
     #print(matches.info())

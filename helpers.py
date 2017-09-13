@@ -73,9 +73,9 @@ def preprocess_matches_for_season(seasons, compute_form = False,
             matches = compute_goal_based_home_advantage(matches)
         if home_advantage == 'both':
             matches = compute_point_based_home_advantage(matches,
-                            column='home_advantage_points')
+                            column_name='home_advantage_points')
             matches = compute_goal_based_home_advantage(matches,
-                            column='home_advantage_goals')
+                            column_name='home_advantage_goals')
 
     if compute_form:
         matches = merge_matches_with_form(matches=matches, exclude_firstn=exclude_firstn,seasons=seasons,window=window,league_name=league_name)
