@@ -39,20 +39,20 @@
     - each section can be run out of sequence
 
 - Command line arguments and corresponding functionality:
-    + 1:
+    + Section 1:
         * Generates training and test scores for each classifier
         * Output used for Tables 1 & 2 in the project report
         * Does not use cross-validation 
         * Uses only features in existing dataset
         * It loops over all classifiers, fits a model and uses it to compute training and test scores for selected metrics
-    + 2:
+    + Section 2:
         * Analysis 2:
         * Uses training data to get the performance scores using k-folds cross-validation with a k=5
         * Output used for Table 3 in the project report
         * This uses the preprocessed data with only existing features
         * it loops over all classifiers and reports back the cross-validation scores for a number of metrics
     
-    + 3:
+    + Section 3:
         Explores the impact of the additional features:
         * The team form features
                 + This loops over multiple windows and computes scores for each classifier 
@@ -69,11 +69,11 @@
                         - exclude_firstn = False, 
                         - home_advantage = 'points' or 'goals'
                 + Output use for Tables 4 & 5 in the project report
-    + 4:
+    + Section 4:
         * This section does the parameter tuning for a subset of algorithms
         * Assumes a fixed home form window based on the results of analysis 3
         * Output used for Table 6 in the project report
-    + 5
+    + Section 5:
         * This section computes the test results for the Adaboost and SGDC classifiers
         * It also generates the ROC curves using Matplotlib (plot windows do open) and confusion matrices
         * Output used for Tables 7 - 9, and Figures 9 - 10 in the project report 
